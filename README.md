@@ -1,21 +1,26 @@
 # dsh-mcp
 
-Lazy MCP client and `/mcp` manager for DeepSeek Harness.
+Lazy MCP client and management surface for DeepSeek Harness.
 
-MCP tools normally enter every request as full schemas. This plugin keeps one
-router tool (`mcp`) in context and connects to servers only when the model asks
-for them:
+Instead of injecting every server's tool schemas into each request, dsh-mcp
+keeps one router tool (`mcp`) in context, connects to a server only when the
+model or a human asks for it, and exposes the same operations through a settings
+page, a sidebar entry and slash commands.
 
-```
-mcp({ action: "servers" })                      → configured servers + status
-mcp({ action: "tools", server: "files" })       → tool names + one-line descriptions
-mcp({ action: "describe", server, tool })       → exact input schema
-mcp({ action: "call", server, tool, arguments } → invoke the tool
-mcp({ action: "refresh", server })              → reconnect and re-list
-```
+## Features
 
-`/mcp` prints the same status table for humans (registration is best-effort:
-it is skipped when the host has no commands service).
+- one `mcp` router tool: `servers`, `tools`, `search`, `describe`, `call`,
+  `refresh`, `resources`, `prompts`, `read`, `prompt`
+- lazy stdio and streamable-http connections; a broken server only marks its own
+  row
+- settings section (also a tab under 内置插件), optional sidebar page
+- server CRUD, search/sort, per-server enable/disable, per-tool disable
+- tool call panel with a JSON argument box; resources and prompts with
+  click-to-read (prompts accept JSON arguments)
+- `/mcp` popup picker, `/mcp-raw` plain command for argument-heavy use
+- call audit at `~/.dsh/mcp-audit.jsonl`, per-server `toolCallTimeoutMs`
+- OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
+  refresh) for streamable-http servers
 
 ## Install
 
@@ -27,7 +32,9 @@ Or from npm once published: `dsh plugin --profile web add @netcatty/dsh-mcp`.
 
 ## Configure
 
-The bundle patch inserts one row; edit it in the profile patch by id:
+The bundle patch inserts one `mcp` row. Edit it in the profile patch by id, or
+use the settings page (writes `~/.dsh/mcp-settings.json`, which wins over the
+patch once present):
 
 ```yaml
 - id: mcp
@@ -38,50 +45,55 @@ The bundle patch inserts one row; edit it in the profile patch by id:
         transport: stdio
         command: npx
         args: ['-y', '@modelcontextprotocol/server-filesystem', '/home/me/work']
+        # optional: enabled: true, disabledTools: [write_file], toolCallTimeoutMs: 60000
       - name: remote
         transport: streamable-http
         url: https://mcp.example.com/mcp
         headers:
           Authorization: Bearer ${TOKEN}
+        # optional: oauth: true, clientId: <id when the server has no dynamic registration>
 ```
 
-`transport` accepts `stdio` (`command`, `args`, `env`, `cwd`) and
-`streamable-http` (`url`, `headers`). Disable the official `mcp-client` rows for
-the same servers to avoid loading their tools directly.
+Disable the official `mcp-client` rows for the same servers; otherwise their
+tools load directly and defeat the lazy path.
 
-## /mcp command
+## Commands
 
 ```
-/mcp                                 all servers
-/mcp refresh                         reconnect every server
-/mcp <server>                        one server's row
-/mcp <server> tools                  tool names + one-line descriptions
-/mcp <server> call <tool> [json]     call with JSON arguments
-/mcp <server> refresh                reconnect one server
-/mcp help                            usage
+/mcp                                  popup: server → tools / reconnect / enable / disable
+/mcp-raw                              all server rows
+/mcp-raw refresh                      reconnect every server
+/mcp-raw <server>                     one server's row
+/mcp-raw <server> tools               tool names + descriptions
+/mcp-raw search <query>               search tools of connected servers
+/mcp-raw <server> call <tool> [json]  call with JSON arguments
+/mcp-raw <server> resources|prompts   list resources / prompts
+/mcp-raw <server> read <uri>          read a resource
+/mcp-raw <server> prompt <name> [json] get a prompt
 ```
 
-The command is read-only: it never edits configuration. Errors come back as
-command errors with the server/tool name in the message.
+Both commands are read-only; the settings page is what edits configuration.
 
 ### Sidebar entry
 
-Set `showInSidebar: true` on the `mcp` row (profile patch) to add an "MCP"
-row to the sidebar and a matching main page. It is off by default; the settings
-section and the 内置插件 tab are always registered.
+Toggle「在侧边栏显示」in the settings page (stored in
+`~/.dsh/mcp-settings.json`), or set `showInSidebar: true` on the `mcp` row. The
+settings section and the 内置插件 tab are always registered.
 
-## Behaviour
+## OAuth
 
-- connections are lazy: first `tools`/`describe`/`call`/`refresh` for a server
-  opens it; a failed server only marks its own row as `error`
-- tool lists are cached per connection; `refresh` reconnects and re-lists
-- `call` forwards `content` and `structuredContent`; text blocks are joined
-- disposal closes every connection
-- only tools are exposed; MCP resources/prompts are not bridged yet
-- OAuth flows are not implemented in the management surface yet
+Set `oauth: true` on a streamable-http server, restart, then click「登录」on its
+card. The browser walks the authorization-code flow; the callback lands on a
+one-shot `127.0.0.1` listener. Tokens are stored in `~/.dsh/mcp-oauth.json`
+(mode 0600) and refreshed automatically. `clientId` is only needed when the
+server does not support dynamic client registration.
 
 ## Known limits
 
-- one router tool means the model must know a server name; `servers` provides
-  the list, so no extra discovery step is needed
-- the plugin does not write configuration; `/mcp` is read-only
+- tool search only covers tools already cached by a connected server
+- `/mcp` is a one-shot grouped picker; a nested server → tool → arguments menu
+  needs a custom composer overlay and is not implemented
+- OAuth was verified against a mock authorization server only; connecting such a
+  server's MCP endpoint with the Bearer token has not been exercised against a
+  real deployment
+- no project-level (per-cwd) server sets; configuration is global
