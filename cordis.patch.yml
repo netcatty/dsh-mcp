@@ -1,0 +1,6 @@
+# dsh-mcp bundle: one plugin row, servers configured under `config.servers`.
+- insert:
+    - id: mcp
+      name: '@netcatty/dsh-mcp'
+      config:
+        servers: []
