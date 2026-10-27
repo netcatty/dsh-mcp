@@ -137,8 +137,9 @@ when the server does not support dynamic client registration.
 
 ## Diagnose
 
-`/mcp diagnose <server>` or the「检查」button on a card reports only what it
-probed. For stdio it resolves the command on `PATH` (missing binary, not a dead
+`/mcp diagnose [<server>]`, the「检查」button on a card, or「检查全部」in the
+header (which reports one summary line such as `2 台异常：dbx — command-missing`)
+reports only what it probed. For stdio it resolves the command on `PATH` (missing binary, not a dead
 process, is what it can tell). For streamable-http it makes one short request and
 classifies the outcome: `http-401/403` (bad credentials), `http-404` (wrong
 path), `http-5xx` (server error), `ECONNREFUSED` (nothing listening), `timeout`,
