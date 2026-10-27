@@ -6,6 +6,9 @@ import { mkdtempSync } from 'node:fs';
 import { apply } from '../lib/index.js';
 import { createFakeHost } from './harness.mjs';
 
+// Keep audit/snapshots in a temp home so test runs never touch the real profile.
+process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'dsh-mcp-plugin-home-'));
+
 const MCP_TOOLS = [
   { name: 'mcp__fake__echo', description: 'echo text back', parameters: { type: 'object', properties: { text: { type: 'string' } } } },
   { name: 'mcp__fake__sum', description: 'add numbers', parameters: { type: 'object', properties: { a: { type: 'number' }, b: { type: 'number' } } } },
