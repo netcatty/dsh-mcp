@@ -39,6 +39,8 @@ dozen servers cost one small schema instead of forty.
   refresh) for streamable-http servers
 - a configuration snapshot before every write (edit, import, restore); the panel
   lists them with their server names and restores one in place
+- an audit trail of activations, deactivations, calls, configuration changes,
+  imports and restores, readable from the panel's「审计」view
 - `mcpServers` JSON import from the settings page: a full document
   (`{"mcpServers": {…}}`), a bare name→config map, or a single entry pasted as
   `"name": {…}`; and an export of the whole document or any subset of servers in
@@ -60,8 +62,9 @@ take effect on a full restart.
 Every file this plugin owns lives in one directory,
 `$DSH_HOME/dsh-plugins/dsh-mcp/` (default `~/.dsh/dsh-plugins/dsh-mcp/`, dir
 0700, files 0600): `settings.json` for servers and the sidebar flag,
-`oauth.json` for OAuth grants, and `snapshots/` for the automatic pre-write
-configuration snapshots (newest 20 kept). `$DSH_HOME/storages/` belongs to the storage
+`oauth.json` for OAuth grants, `snapshots/` for the automatic pre-write
+configuration snapshots (newest 20 kept), and `audit.jsonl` for the append-only
+event trail (rotated at 5 MiB). `$DSH_HOME/storages/` belongs to the storage
 backend (`dsh-storage-json`), so this author's plugins share one namespace
 instead: `$DSH_HOME/dsh-plugins/<plugin>/`. Files written by earlier versions
 (`~/.dsh/mcp-settings.json`, `~/.dsh/mcp-oauth.json`, `~/.dsh/dsh-mcp/`) are
