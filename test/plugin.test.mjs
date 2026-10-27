@@ -119,6 +119,7 @@ test('/mcp reports servers and their tools', async () => {
   assert.equal(deactivated.kind, 'success');
   assert.deepEqual(host.restrictions.get(agent), ['mcp__fake__echo', 'mcp__fake__sum']);
   assert.equal((await command.handler({ rawInput: 'activate', agent })).kind, 'error');
+  assert.match((await command.handler({ rawInput: 'help' })).text, /\/mcp activate <server>/);
   assert.equal((await command.handler({ rawInput: 'nope tools' })).kind, 'error');
   host.dispose();
 });

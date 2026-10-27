@@ -91,6 +91,21 @@ test('clear drops one Agent\'s activations or every Agent\'s', () => {
   host.dispose();
 });
 
+test('forgetServer drops that server across Agents only', () => {
+  const host = createFakeHost({ tools: TOOLS, agents: 2 });
+  const visibility = createVisibility(host.ctx, { lazy: true, now: () => 1000, defaultTtlMinutes: 5 });
+  visibility.mount({ agents: { list: () => host.agents }, on: () => () => {} });
+  visibility.activate(host.agents[0], { server: 'alpha' });
+  visibility.activate(host.agents[1], { server: 'alpha' });
+  visibility.activate(host.agents[1], { server: 'beta' });
+
+  assert.equal(visibility.forgetServer('alpha'), 2);
+  assert.equal(visibility.status(host.agents[0]).active.length, 0);
+  assert.equal(visibility.status(host.agents[1]).active.length, 1);
+  assert.equal(visibility.forgetServer('missing'), 0);
+  host.dispose();
+});
+
 test('summary aggregates activations across live Agents', () => {
   const host = createFakeHost({ tools: TOOLS, agents: 2 });
   const visibility = createVisibility(host.ctx, { lazy: true, now: () => 1000, defaultTtlMinutes: 5 });
