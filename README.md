@@ -34,7 +34,7 @@ dozen servers cost one small schema instead of forty.
   enable/disable, reconnect, call panel, resources, a per-server count of tools
   currently activated in live sessions, and one button that clears every
   session's activations
-- one `/mcp` command (status, tools, search, call, activate, deactivate)
+- one `/mcp` command (status, tools, search, call, activate, deactivate, diagnose, help)
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
 - `mcpServers` JSON import from the settings page: a full document
@@ -134,6 +134,16 @@ one-shot `127.0.0.1` listener. Tokens are stored in
 automatically; the access token is injected as the
 `Authorization` header on the provisioned client row. `clientId` is only needed
 when the server does not support dynamic client registration.
+
+## Diagnose
+
+`/mcp diagnose <server>` or the「检查」button on a card reports only what it
+probed. For stdio it resolves the command on `PATH` (missing binary, not a dead
+process, is what it can tell). For streamable-http it makes one short request and
+classifies the outcome: `http-401/403` (bad credentials), `http-404` (wrong
+path), `http-5xx` (server error), `ECONNREFUSED` (nothing listening), `timeout`,
+`bad-port`, or `reachable` with the latency. A reachable endpoint still does not
+prove a working MCP session — the tool count does.
 
 ## Known limits
 
