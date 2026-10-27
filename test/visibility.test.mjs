@@ -118,6 +118,7 @@ test('summary aggregates activations across live Agents', () => {
   assert.equal(summary.total, 2);
   assert.deepEqual(summary.byServer, { alpha: 1, beta: 1 });
   assert.deepEqual(summary.tools.map((tool) => tool.name), ['mcp__alpha__read', 'mcp__beta__write']);
+  for (const tool of summary.tools) assert.equal(typeof tool.expiresAt, 'number');
   host.dispose();
 });
 

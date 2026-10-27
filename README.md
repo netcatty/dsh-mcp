@@ -32,8 +32,8 @@ dozen servers cost one small schema instead of forty.
   instructions, auto-reconnect and pagination come from the Host
 - settings page and optional sidebar entry: server CRUD, search/sort,
   enable/disable, reconnect, call panel, resources, a per-server count of tools
-  currently activated in live sessions, and one button that clears every
-  session's activations
+  currently activated in live sessions (with the minutes left before they
+  expire), and one button that clears every session's activations
 - one `/mcp` command (status, tools, search, call, activate, deactivate, diagnose, help)
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
