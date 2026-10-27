@@ -37,6 +37,9 @@ dozen servers cost one small schema instead of forty.
 - one `/mcp` command (status, tools, search, call, activate, deactivate)
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
+- `mcpServers` JSON import from the settings page, and an export that replaces
+  `env`/`headers` values with `<REDACTED>` and `cwd` with `<REDACTED:LOCAL_PATH>`
+  so the document can be shared
 
 ## Install
 
