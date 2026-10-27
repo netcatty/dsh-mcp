@@ -72,6 +72,10 @@ test('activation narrows the per-Agent restriction and the guard follows it', as
   const status = await definition.execute({ action: 'status' }, { agent });
   assert.match(status.text, /active mcp__fake__echo/);
 
+  // The settings page has no Agent; it still sees the session's activation.
+  const panel = await definition.execute({ action: 'servers' });
+  assert.match(panel.text, /active=1/);
+
   const deactivated = await definition.execute({ action: 'deactivate', server: 'fake' }, { agent });
   assert.match(deactivated.text, /已停用/);
   assert.deepEqual(host.restrictions.get(agent), ['mcp__fake__echo', 'mcp__fake__sum']);

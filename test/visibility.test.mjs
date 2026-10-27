@@ -66,6 +66,21 @@ test('the guard denies an inactive MCP tool and allows an active one', () => {
   host.dispose();
 });
 
+test('summary aggregates activations across live Agents', () => {
+  const host = createFakeHost({ tools: TOOLS, agents: 2 });
+  const visibility = createVisibility(host.ctx, { lazy: true, now: () => 1000, defaultTtlMinutes: 5 });
+  visibility.mount({ agents: { list: () => host.agents }, on: () => () => {} });
+
+  visibility.activate(host.agents[0], { server: 'alpha' });
+  visibility.activate(host.agents[1], { server: 'beta' });
+  const summary = visibility.summary();
+  assert.equal(summary.agents, 2);
+  assert.equal(summary.total, 2);
+  assert.deepEqual(summary.byServer, { alpha: 1, beta: 1 });
+  assert.deepEqual(summary.tools.map((tool) => tool.name), ['mcp__alpha__read', 'mcp__beta__write']);
+  host.dispose();
+});
+
 test('deactivation restores the hide set and lazy=false hides nothing', () => {
   const { host, visibility } = setup();
   const agent = host.agents[0];

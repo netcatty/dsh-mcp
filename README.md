@@ -31,7 +31,8 @@ dozen servers cost one small schema instead of forty.
 - official client rows provisioned per server, so approvals, images, server
   instructions, auto-reconnect and pagination come from the Host
 - settings page and optional sidebar entry: server CRUD, search/sort,
-  enable/disable, reconnect, call panel, resources
+  enable/disable, reconnect, call panel, resources, and a per-server count of
+  tools currently activated in live sessions
 - `/mcp` and `/mcp-raw` commands (status, tools, search, call)
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
