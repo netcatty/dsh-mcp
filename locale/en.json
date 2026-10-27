@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "MCP Manager",
+    "description": "Lazy MCP management on top of the official client: tools activate per session; diagnostics, resources, snapshots, audit and JSON import/export."
+  }
+}

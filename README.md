@@ -22,6 +22,22 @@ dozen servers cost one small schema instead of forty.
    turn and is callable with full Host approval. Activations are memory-only,
    per Agent, TTL 1–30 minutes (default 30).
 
+## Upgrading from 0.1
+
+0.2 moved MCP itself onto the official client and made tool schemas lazy, so a
+few things change:
+
+- **Restart `dsh web`.** The plugin now provisions loader rows; a page refresh is not enough.
+- **Files move automatically.** `~/.dsh/mcp-settings.json` and `~/.dsh/mcp-oauth.json` are migrated once into
+  `~/.dsh/dsh-plugins/dsh-mcp/` (dir 0700, files 0600). Nothing to do unless you had a custom path.
+- **Tools are hidden by default.** A session sees only the `mcp` router until it activates
+  something (`mcp({action:"activate"})` or `/mcp activate <server> [tool…]`); activations
+  expire after 30 minutes. Set `lazy: false` on the `mcp` row to keep the old always-on behaviour.
+- **Commands merged.** `/mcp-raw` is gone; everything is `/mcp` (`status`, `search`, `<server> tools`,
+  `<server> call`, `activate`, `deactivate`, `scope`, `diagnose`, `help`).
+- **New files** next to the settings: `snapshots/` (pre-write config snapshots) and `audit.jsonl`
+  (activations, calls, config changes).
+
 ## Features
 
 - one `mcp` router tool: `servers`, `tools`, `search`, `describe`, `activate`,
