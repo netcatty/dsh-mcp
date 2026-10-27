@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { apply } from '../lib/index.js';
+import { recent as recentAudit } from '../lib/audit.js';
 import { createFakeHost } from './harness.mjs';
 
 // Keep audit/snapshots in a temp home so test runs never touch the real profile.
@@ -189,6 +190,9 @@ test('/mcp reports servers and their tools', async () => {
   const called = await command.handler({ rawInput: 'fake call echo {"text":"hi"}' });
   assert.equal(called.kind, 'success');
   assert.match(called.text, /mcp__fake__echo/);
+  const callEvents = recentAudit({ action: 'call' });
+  assert.ok(callEvents.length > 0);
+  assert.match(callEvents[0].detail, /mcp__fake__echo/);
 
   const agent = host.agents[0];
   const activated = await command.handler({ rawInput: 'activate fake echo', agent });

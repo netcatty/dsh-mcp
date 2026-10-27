@@ -39,14 +39,15 @@ dozen servers cost one small schema instead of forty.
   per-tool「禁用」switch (a disabled tool is hidden from the model, cannot be
   activated and cannot be called), a per-server count of tools currently
   activated in live sessions (with the minutes left before they expire), and one
-  button that clears every session's activations
+  button that clears every session's activations, per-server「复制」and header
+  「全部启用 / 全部停用」
 - one `/mcp` command (status, tools, search, call, activate, deactivate, diagnose, help)
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
 - a configuration snapshot before every write (edit, import, restore); the panel
   lists them with their server names and restores one in place
-- an audit trail of activations, deactivations, calls, configuration changes,
-  imports and restores, readable from the panel's「审计」view
+- an audit trail of activations, deactivations, calls (with the result summary),
+  configuration changes, imports and restores, readable from the panel's「审计」view
 - `mcpServers` JSON import from the settings page: a full document
   (`{"mcpServers": {…}}`), a bare name→config map, or a single entry pasted as
   `"name": {…}`; and an export of the whole document or any subset of servers in
