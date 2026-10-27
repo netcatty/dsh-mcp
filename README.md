@@ -37,6 +37,8 @@ dozen servers cost one small schema instead of forty.
 - one `/mcp` command (status, tools, search, call, activate, deactivate, diagnose, help)
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
+- a configuration snapshot before every write (edit, import, restore); the panel
+  lists them with their server names and restores one in place
 - `mcpServers` JSON import from the settings page: a full document
   (`{"mcpServers": {…}}`), a bare name→config map, or a single entry pasted as
   `"name": {…}`; and an export of the whole document or any subset of servers in
@@ -58,7 +60,8 @@ take effect on a full restart.
 Every file this plugin owns lives in one directory,
 `$DSH_HOME/dsh-plugins/dsh-mcp/` (default `~/.dsh/dsh-plugins/dsh-mcp/`, dir
 0700, files 0600): `settings.json` for servers and the sidebar flag,
-`oauth.json` for OAuth grants. `$DSH_HOME/storages/` belongs to the storage
+`oauth.json` for OAuth grants, and `snapshots/` for the automatic pre-write
+configuration snapshots (newest 20 kept). `$DSH_HOME/storages/` belongs to the storage
 backend (`dsh-storage-json`), so this author's plugins share one namespace
 instead: `$DSH_HOME/dsh-plugins/<plugin>/`. Files written by earlier versions
 (`~/.dsh/mcp-settings.json`, `~/.dsh/mcp-oauth.json`, `~/.dsh/dsh-mcp/`) are
@@ -145,6 +148,15 @@ classifies the outcome: `http-401/403` (bad credentials), `http-404` (wrong
 path), `http-5xx` (server error), `ECONNREFUSED` (nothing listening), `timeout`,
 `bad-port`, or `reachable` with the latency. A reachable endpoint still does not
 prove a working MCP session — the tool count does.
+
+## Governance boundary
+
+This plugin owns *visibility* and configuration: which servers exist, whether
+they are enabled, and which of their tools a session can see. Execution policy
+belongs to `dsh-guard`: it gates every tool call (allow / ask / deny, three-way
+approval) and now sees stable `mcp__<server>__<tool>` names, so per-tool rules
+live there instead of being duplicated here. Two execution policies in two
+plugins would only disagree.
 
 ## Known limits
 
