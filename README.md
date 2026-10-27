@@ -104,6 +104,8 @@ mcp({action:"deactivate", server:"files"})     # drop it again
 /mcp-raw <server>                     one server's row
 /mcp-raw <server> tools               tool names
 /mcp-raw <server> call <tool> [json]  call through the official pipeline
+/mcp-raw activate <server> [tool…]    activate tools for the receiving session
+/mcp-raw deactivate <server>          hide them again
 ```
 
 Both commands are read-only; the settings page is what edits configuration.

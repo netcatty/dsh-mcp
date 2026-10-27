@@ -108,6 +108,17 @@ test('/mcp reports servers and their tools', async () => {
   const called = await command.handler({ rawInput: 'fake call echo {"text":"hi"}' });
   assert.equal(called.kind, 'success');
   assert.match(called.text, /mcp__fake__echo/);
+
+  const agent = host.agents[0];
+  const activated = await command.handler({ rawInput: 'activate fake echo', agent });
+  assert.equal(activated.kind, 'success');
+  assert.deepEqual(host.restrictions.get(agent), ['mcp__fake__sum']);
+  assert.match((await command.handler({ rawInput: '', agent })).text, /hidden=1 active=1/);
+
+  const deactivated = await command.handler({ rawInput: 'deactivate fake', agent });
+  assert.equal(deactivated.kind, 'success');
+  assert.deepEqual(host.restrictions.get(agent), ['mcp__fake__echo', 'mcp__fake__sum']);
+  assert.equal((await command.handler({ rawInput: 'activate', agent })).kind, 'error');
   assert.equal((await command.handler({ rawInput: 'nope tools' })).kind, 'error');
   host.dispose();
 });
