@@ -98,6 +98,37 @@ test('lazy=false keeps every MCP tool visible and the guard inert', async () => 
   host.dispose();
 });
 
+test('/mcp scope moves a server between global and the current workspace', async () => {
+  const host = createFakeHost({
+    tools: MCP_TOOLS,
+    workspaces: [{ id: 'ws-1', title: 'one', path: '/tmp/one', sessionIds: ['agent-1'] }],
+  });
+  await apply(host.ctx, {
+    settingsPath: settingsPath(),
+    servers: [
+      { name: 'fake', transport: 'stdio', command: process.execPath },
+      { name: 'scoped', transport: 'stdio', command: process.execPath, workspaceId: 'ws-2' },
+    ],
+  });
+  const agent = host.agents[0];
+  const command = host.commands.find((item) => item.name === 'mcp');
+
+  const toGlobal = await command.handler({ rawInput: 'scope scoped global', agent });
+  assert.equal(toGlobal.kind, 'success');
+  const panel = await host.registered.get('mcp').execute({ action: 'servers' });
+  assert.doesNotMatch(panel.text, /scoped \[.*仅当前工作区/);
+
+  const toHere = await command.handler({ rawInput: 'scope scoped here', agent });
+  assert.equal(toHere.kind, 'success');
+  assert.match(toHere.text, /ws-1/);
+  const scopedRow = (await host.registered.get('mcp').execute({ action: 'servers' })).text;
+  assert.match(scopedRow, /scoped .*仅当前工作区/);
+
+  assert.equal((await command.handler({ rawInput: 'scope nope global', agent })).kind, 'error');
+  assert.equal((await command.handler({ rawInput: 'scope scoped', agent })).kind, 'error');
+  host.dispose();
+});
+
 test('a workspace-scoped server is invisible to sessions outside it', async () => {
   const host = createFakeHost({ tools: MCP_TOOLS });
   await apply(host.ctx, {

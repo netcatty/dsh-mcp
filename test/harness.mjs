@@ -2,7 +2,7 @@
 // scope with `tools.restrict`, and command registration. Tests assert against
 // the same seams the real Host exposes.
 
-export function createFakeHost({ tools = [], agents: agentCount = 1 } = {}) {
+export function createFakeHost({ tools = [], agents: agentCount = 1, workspaces = [] } = {}) {
   const registered = new Map();
   const hostTools = new Map(tools.map((tool) => [tool.name, tool]));
   const guards = [];
@@ -56,7 +56,9 @@ export function createFakeHost({ tools = [], agents: agentCount = 1 } = {}) {
       return dispose;
     },
     inject(deps, callback) {
-      if (Array.isArray(deps) && deps.includes('agents')) callback(agentCtx);
+      if (!Array.isArray(deps)) return;
+      if (deps.includes('agents')) callback(agentCtx);
+      if (deps.includes('workspaceRegistry')) callback({ workspaceRegistry: { list: () => workspaces } });
     },
     get(name) {
       return name === 'commands' ? { register: (value) => { commands.push(value); } } : undefined;

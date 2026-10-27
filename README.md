@@ -122,6 +122,7 @@ mcp({action:"deactivate", server:"files"})     # drop it again
 /mcp activate <server> [tool…]    activate tools for the receiving session
 /mcp deactivate <server>          hide that server's tools again
 /mcp deactivate                   hide everything in this session
+/mcp scope <server> global|here   change visibility (here = current workspace)
 ```
 
 The command is read-only apart from activate/deactivate; the settings page is
