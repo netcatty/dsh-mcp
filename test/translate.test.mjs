@@ -60,6 +60,12 @@ test('renderEntriesText joins several servers into one fragment list', () => {
   assert.deepEqual(again.map((server) => server.name), ['files', 'remote']);
 });
 
+test('workspace scope survives import and export', () => {
+  const servers = parseMcpServers(JSON.stringify({ mcpServers: { scoped: { command: 'node', workspaceId: 'ws-1' } } }));
+  assert.equal(servers[0].workspaceId, 'ws-1');
+  assert.equal(toMcpServers(servers).mcpServers.scoped.workspaceId, 'ws-1');
+});
+
 test('a single entry fragment imports directly', () => {
   const text = '"solo": {\n  "command": "node",\n  "args": ["server.mjs"]\n}';
   const servers = parseMcpServers(text);
