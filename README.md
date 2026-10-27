@@ -31,8 +31,9 @@ dozen servers cost one small schema instead of forty.
 - official client rows provisioned per server, so approvals, images, server
   instructions, auto-reconnect and pagination come from the Host
 - settings page and optional sidebar entry: server CRUD, search/sort,
-  enable/disable, reconnect, call panel, resources, and a per-server count of
-  tools currently activated in live sessions
+  enable/disable, reconnect, call panel, resources, a per-server count of tools
+  currently activated in live sessions, and one button that clears every
+  session's activations
 - one `/mcp` command (status, tools, search, call, activate, deactivate)
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
@@ -105,7 +106,8 @@ mcp({action:"deactivate", server:"files"})     # drop it again
 /mcp <server> tools               tool names
 /mcp <server> call <tool> [json]  call through the official pipeline
 /mcp activate <server> [tool…]    activate tools for the receiving session
-/mcp deactivate <server>          hide them again
+/mcp deactivate <server>          hide that server's tools again
+/mcp deactivate                   hide everything in this session
 ```
 
 The command is read-only apart from activate/deactivate; the settings page is
