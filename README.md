@@ -33,7 +33,7 @@ dozen servers cost one small schema instead of forty.
 - settings page and optional sidebar entry: server CRUD, search/sort,
   enable/disable, reconnect, call panel, resources, and a per-server count of
   tools currently activated in live sessions
-- `/mcp` and `/mcp-raw` commands (status, tools, search, call)
+- one `/mcp` command (status, tools, search, call, activate, deactivate)
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
 
@@ -100,15 +100,16 @@ mcp({action:"deactivate", server:"files"})     # drop it again
 
 ```
 /mcp                                  every server row
-/mcp-raw search <query>               search registered MCP tools
-/mcp-raw <server>                     one server's row
-/mcp-raw <server> tools               tool names
-/mcp-raw <server> call <tool> [json]  call through the official pipeline
-/mcp-raw activate <server> [tool…]    activate tools for the receiving session
-/mcp-raw deactivate <server>          hide them again
+/mcp search <query>               search registered MCP tools
+/mcp <server>                     one server's row
+/mcp <server> tools               tool names
+/mcp <server> call <tool> [json]  call through the official pipeline
+/mcp activate <server> [tool…]    activate tools for the receiving session
+/mcp deactivate <server>          hide them again
 ```
 
-Both commands are read-only; the settings page is what edits configuration.
+The command is read-only apart from activate/deactivate; the settings page is
+what edits configuration.
 
 ### Sidebar entry
 
