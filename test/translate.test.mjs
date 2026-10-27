@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeServers, parseMcpServers, toMcpServers } from '../lib/translate.js';
+import { mergeServers, parseMcpServers, renderEntryText, toMcpServers } from '../lib/translate.js';
 
 const DOC = JSON.stringify({
   mcpServers: {
@@ -48,6 +48,25 @@ test('toMcpServers redacts secrets by default and can be asked not to', () => {
 
   const plain = toMcpServers(servers, { redact: false });
   assert.equal(plain.mcpServers.files.env.TOKEN, 'secret');
+});
+
+test('a single entry fragment imports directly', () => {
+  const text = '"solo": {\n  "command": "node",\n  "args": ["server.mjs"]\n}';
+  const servers = parseMcpServers(text);
+  assert.equal(servers.length, 1);
+  assert.equal(servers[0].name, 'solo');
+  assert.equal(servers[0].command, 'node');
+  assert.deepEqual(servers[0].args, ['server.mjs']);
+});
+
+test('renderEntryText emits a brace-less fragment that parses back', () => {
+  const [server] = parseMcpServers(DOC);
+  const text = renderEntryText(server);
+  assert.match(text, /^"files": \{/);
+  assert.doesNotMatch(text, /^\{/);
+  const [again] = parseMcpServers(text);
+  assert.equal(again.name, 'files');
+  assert.equal(again.env.TOKEN, '<REDACTED>');
 });
 
 test('a redacted export imports back with placeholders', () => {
