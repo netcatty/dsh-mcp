@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeServers, parseMcpServers, renderEntryText, toMcpServers } from '../lib/translate.js';
+import { mergeServers, parseMcpServers, renderEntriesText, renderEntryText, toMcpServers } from '../lib/translate.js';
 
 const DOC = JSON.stringify({
   mcpServers: {
@@ -48,6 +48,16 @@ test('toMcpServers redacts secrets by default and can be asked not to', () => {
 
   const plain = toMcpServers(servers, { redact: false });
   assert.equal(plain.mcpServers.files.env.TOKEN, 'secret');
+});
+
+test('renderEntriesText joins several servers into one fragment list', () => {
+  const servers = parseMcpServers(DOC).slice(0, 2);
+  const text = renderEntriesText(servers);
+  assert.match(text, /^"files": \{/);
+  assert.match(text, /\},\n"remote": \{/);
+  // The pasted fragment list has no outer braces; the parser adds them once.
+  const again = parseMcpServers(text);
+  assert.deepEqual(again.map((server) => server.name), ['files', 'remote']);
 });
 
 test('a single entry fragment imports directly', () => {

@@ -39,8 +39,9 @@ dozen servers cost one small schema instead of forty.
   refresh) for streamable-http servers
 - `mcpServers` JSON import from the settings page: a full document
   (`{"mcpServers": {…}}`), a bare name→config map, or a single entry pasted as
-  `"name": {…}`; and an export of the whole document or one server in that same
-  fragment shape, with `env`/`headers` values replaced by `<REDACTED>` and `cwd`
+  `"name": {…}`; and an export of the whole document or any subset of servers in
+  that same fragment shape (several selected servers become a comma-separated
+  fragment list), with `env`/`headers` values replaced by `<REDACTED>` and `cwd`
   by `<REDACTED:LOCAL_PATH>`
 
 ## Install
