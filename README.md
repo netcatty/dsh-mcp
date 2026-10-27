@@ -28,8 +28,9 @@ dozen servers cost one small schema instead of forty.
   `deactivate`, `status`, `refresh`
 - default-lazy: no MCP schema in context until activated; `lazy: false` restores
   always-on tools
-- optional workspace scope per server (`workspaceId`): a scoped server and its
-  tools exist only for sessions in that workspace; unscoped servers stay global
+- optional workspace scope per server (`workspaceIds`): a scoped server and its
+  tools exist only for sessions in one of those workspaces; an empty list means
+  global. The legacy single `workspaceId` is accepted and normalized into it
 - official client rows provisioned per server, so approvals, images, server
   instructions, auto-reconnect and pagination come from the Host
 - settings page and optional sidebar entry: server CRUD, search/sort,
@@ -87,7 +88,7 @@ present):
         transport: stdio
         command: npx
         args: ['-y', '@modelcontextprotocol/server-filesystem', '/home/me/work']
-        # optional: enabled, env, cwd, toolCallTimeoutMs, workspaceId: <工作区 id>
+        # optional: enabled, env, cwd, toolCallTimeoutMs, workspaceIds: [<工作区 id>…]
       - name: remote
         transport: streamable-http
         url: https://mcp.example.com/mcp
@@ -122,7 +123,7 @@ mcp({action:"deactivate", server:"files"})     # drop it again
 /mcp activate <server> [tool…]    activate tools for the receiving session
 /mcp deactivate <server>          hide that server's tools again
 /mcp deactivate                   hide everything in this session
-/mcp scope <server> global|here   change visibility (here = current workspace)
+/mcp scope <server> global|here|id,id   change visibility (here = current workspace)
 ```
 
 The command is read-only apart from activate/deactivate; the settings page is
