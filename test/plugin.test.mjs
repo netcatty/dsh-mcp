@@ -98,6 +98,30 @@ test('lazy=false keeps every MCP tool visible and the guard inert', async () => 
   host.dispose();
 });
 
+test('a workspace-scoped server is invisible to sessions outside it', async () => {
+  const host = createFakeHost({ tools: MCP_TOOLS });
+  await apply(host.ctx, {
+    settingsPath: settingsPath(),
+    servers: [
+      { name: 'fake', transport: 'stdio', command: process.execPath },
+      { name: 'scoped', transport: 'stdio', command: process.execPath, workspaceId: 'ws-other' },
+    ],
+  });
+  const agent = host.agents[0];
+  const definition = host.registered.get('mcp');
+
+  const forAgent = await definition.execute({ action: 'servers' }, { agent });
+  assert.doesNotMatch(forAgent.text, /scoped/);
+  const forPanel = await definition.execute({ action: 'servers' });
+  assert.match(forPanel.text, /scoped/);
+
+  await assert.rejects(
+    definition.execute({ action: 'activate', server: 'scoped' }, { agent }),
+    /不属于当前工作区/,
+  );
+  host.dispose();
+});
+
 test('/mcp reports servers and their tools', async () => {
   const host = createFakeHost({ tools: MCP_TOOLS });
   await apply(host.ctx, {

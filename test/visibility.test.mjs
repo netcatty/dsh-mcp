@@ -122,6 +122,27 @@ test('summary aggregates activations across live Agents', () => {
   host.dispose();
 });
 
+test('a tool outside the Agent scope stays hidden and uncallable', () => {
+  const host = createFakeHost({ tools: TOOLS });
+  const scoped = createVisibility(host.ctx, {
+    lazy: true,
+    now: () => 1000,
+    isToolVisible: (name) => !name.startsWith('mcp__beta__'),
+  });
+  scoped.mount({ agents: { list: () => host.agents }, on: () => () => {} });
+  const agent = host.agents[0];
+  assert.deepEqual(host.restrictions.get(agent), ['mcp__alpha__read', 'mcp__beta__write']);
+
+  scoped.activate(agent, { server: 'beta' });
+  // beta is activated but out of scope, so it stays denied; alpha is in scope
+  // but not activated, so it stays denied too.
+  assert.deepEqual(host.restrictions.get(agent), ['mcp__alpha__read', 'mcp__beta__write']);
+  const guard = host.guards[0];
+  assert.match(guard({ name: 'mcp__beta__write', agent }), /不属于当前工作区/);
+  assert.match(guard({ name: 'mcp__alpha__read', agent }), /未在当前会话激活/);
+  host.dispose();
+});
+
 test('deactivation restores the hide set and lazy=false hides nothing', () => {
   const { host, visibility } = setup();
   const agent = host.agents[0];
