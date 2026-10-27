@@ -1,6 +1,11 @@
 # dsh-mcp bundle: one plugin row, servers configured under `config.servers`.
+# MCP itself runs through the official @deepseek-ai/dsh-mcp-client rows this
+# plugin provisions; `lazy` keeps their schemas out of a session until
+# `mcp({action:"activate"})`.
 - insert:
     - id: mcp
       name: '@netcatty/dsh-mcp'
       config:
         servers: []
+        lazy: true
+        defaultTtlMinutes: 30

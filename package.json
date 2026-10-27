@@ -1,7 +1,7 @@
 {
   "name": "@netcatty/dsh-mcp",
-  "version": "0.1.0",
-  "description": "Lazy MCP client and /mcp manager for DeepSeek Harness: one router tool, on-demand schemas, server health",
+  "version": "0.2.0",
+  "description": "Lazy MCP manager for DeepSeek Harness: provisions the official MCP client, keeps tool schemas out of context until a session activates them, plus /mcp commands and a settings page",
   "type": "module",
   "main": "lib/index.js",
   "license": "MIT",
@@ -32,8 +32,5 @@
     "./client": {
       "default": "./lib/client.js"
     }
-  },
-  "dependencies": {
-    "@modelcontextprotocol/client": "^2.2.0"
   }
 }

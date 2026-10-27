@@ -1,0 +1,80 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createVisibility, parsePublicName, publicNameFor } from '../lib/visibility.js';
+import { createFakeHost } from './harness.mjs';
+
+const TOOLS = [
+  { name: 'mcp__alpha__read', description: 'read a doc' },
+  { name: 'mcp__beta__write', description: 'write a doc' },
+  { name: 'bash' },
+];
+
+function setup({ lazy = true, clock } = {}) {
+  const host = createFakeHost({ tools: TOOLS });
+  const state = { at: 1000 };
+  const now = clock ?? (() => state.at);
+  const visibility = createVisibility(host.ctx, { lazy, now, defaultTtlMinutes: 2 });
+  const agentCtx = { agents: { list: () => host.agents }, on: () => () => {} };
+  visibility.mount(agentCtx);
+  return { host, visibility, state };
+}
+
+test('public names round-trip', () => {
+  assert.equal(publicNameFor('srv', 'do'), 'mcp__srv__do');
+  assert.deepEqual(parsePublicName('mcp__srv__do'), { server: 'srv', tool: 'do' });
+  assert.equal(parsePublicName('bash'), null);
+});
+
+test('every MCP tool starts hidden; activation exposes only the requested one', () => {
+  const { host, visibility } = setup();
+  const agent = host.agents[0];
+  assert.deepEqual(host.restrictions.get(agent), ['mcp__alpha__read', 'mcp__beta__write']);
+
+  const result = visibility.activate(agent, { server: 'alpha' });
+  assert.deepEqual(result.activated, ['mcp__alpha__read']);
+  assert.deepEqual(host.restrictions.get(agent), ['mcp__beta__write']);
+
+  const status = visibility.status(agent);
+  assert.equal(status.active.length, 1);
+  assert.deepEqual(status.hidden, ['mcp__beta__write']);
+  host.dispose();
+});
+
+test('activation expires after its TTL', () => {
+  const { host, visibility, state } = setup();
+  const agent = host.agents[0];
+  visibility.activate(agent, { server: 'alpha', ttlMinutes: 1 });
+  assert.equal(host.restrictions.get(agent).length, 1);
+
+  state.at += 61_000;
+  visibility.refresh();
+  assert.deepEqual(host.restrictions.get(agent), ['mcp__alpha__read', 'mcp__beta__write']);
+  assert.equal(visibility.status(agent).active.length, 0);
+  host.dispose();
+});
+
+test('the guard denies an inactive MCP tool and allows an active one', () => {
+  const { host, visibility } = setup();
+  const agent = host.agents[0];
+  const definition = host.registered.get('mcp');
+  assert.equal(definition, undefined, 'the controller registers no tool of its own');
+
+  const guard = host.guards[0];
+  assert.match(guard({ name: 'mcp__alpha__read', agent }), /未在当前会话激活/);
+  visibility.activate(agent, { server: 'alpha' });
+  assert.equal(guard({ name: 'mcp__alpha__read', agent }), undefined);
+  host.dispose();
+});
+
+test('deactivation restores the hide set and lazy=false hides nothing', () => {
+  const { host, visibility } = setup();
+  const agent = host.agents[0];
+  visibility.activate(agent, { server: 'alpha' });
+  visibility.deactivate(agent, { server: 'alpha' });
+  assert.deepEqual(host.restrictions.get(agent), ['mcp__alpha__read', 'mcp__beta__write']);
+  host.dispose();
+
+  const relaxed = setup({ lazy: false });
+  assert.equal(relaxed.host.restrictions.get(relaxed.host.agents[0]), undefined);
+  relaxed.host.dispose();
+});
