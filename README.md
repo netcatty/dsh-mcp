@@ -45,12 +45,16 @@ dozen servers cost one small schema instead of forty.
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
 - a configuration snapshot before every write (edit, import, restore); the panel
-  lists them with their server names and restores one in place
+  lists them with their server names, diffs a snapshot against the live config
+  (added / removed / changed fields) and restores one in place
+- environment variables edited as key/value rows, optional 60 s automatic health
+  checks, and a call panel that remembers the last arguments/result per server
 - an audit trail of activations, deactivations, calls (with the result summary),
   configuration changes, imports and restores, readable from the panel's「审计」view
-- `mcpServers` JSON import from the settings page: a full document
+- `mcpServers` JSON import from the settings page (overwrite or skip existing
+  servers), and an export that can keep or redact secrets; a full document
   (`{"mcpServers": {…}}`), a bare name→config map, or a single entry pasted as
-  `"name": {…}`; and an export of the whole document or any subset of servers in
+  `"name": {…}`; and exporting the whole document or any subset of servers in
   that same fragment shape (several selected servers become a comma-separated
   fragment list), with `env`/`headers` values replaced by `<REDACTED>` and `cwd`
   by `<REDACTED:LOCAL_PATH>`
