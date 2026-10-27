@@ -53,6 +53,15 @@ test('activation expires after its TTL', () => {
   host.dispose();
 });
 
+test('activating a server whose tools never registered explains why', () => {
+  const { host, visibility } = setup();
+  assert.throws(
+    () => visibility.activate(host.agents[0], { server: 'ghost', tools: ['x'] }),
+    /尚未连接完成/,
+  );
+  host.dispose();
+});
+
 test('the guard denies an inactive MCP tool and allows an active one', () => {
   const { host, visibility } = setup();
   const agent = host.agents[0];
