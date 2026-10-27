@@ -137,6 +137,8 @@ when the server does not support dynamic client registration.
   activates is never visible
 - MCP prompt templates are not supported (the official client does not expose
   them); resources are reachable through `@deepseek-ai/dsh-mcp-resources`
+- panel trials carry no Agent: a tool that needs approval (`ask`) is refused by
+  the Host. Activate it in a session and let the model call it instead
 - no project-level (per-cwd) server sets; configuration is global
 - OAuth was verified against a mock authorization server only; connecting such a
   server's MCP endpoint with the Bearer token has not been exercised against a
