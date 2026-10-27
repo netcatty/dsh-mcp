@@ -153,6 +153,29 @@ test('a workspace-scoped server is invisible to sessions outside it', async () =
   host.dispose();
 });
 
+test('a disabled tool is listed as disabled, not activatable, not callable', async () => {
+  const host = createFakeHost({ tools: MCP_TOOLS });
+  await apply(host.ctx, {
+    settingsPath: settingsPath(),
+    servers: [{ name: 'fake', transport: 'stdio', command: process.execPath, disabledTools: ['echo'] }],
+  });
+  const agent = host.agents[0];
+  const definition = host.registered.get('mcp');
+
+  const tools = await definition.execute({ action: 'tools', server: 'fake' }, { agent });
+  assert.match(tools.text, /sum/);
+  assert.doesNotMatch(tools.text, /echo/);
+
+  await assert.rejects(
+    definition.execute({ action: 'activate', server: 'fake', tools: ['echo'] }, { agent }),
+    /已被配置禁用/,
+  );
+
+  const guard = host.guards[0];
+  assert.match(guard({ name: 'mcp__fake__echo', agent }), /不在当前可见范围内/);
+  host.dispose();
+});
+
 test('/mcp reports servers and their tools', async () => {
   const host = createFakeHost({ tools: MCP_TOOLS });
   await apply(host.ctx, {

@@ -138,7 +138,7 @@ test('a tool outside the Agent scope stays hidden and uncallable', () => {
   // but not activated, so it stays denied too.
   assert.deepEqual(host.restrictions.get(agent), ['mcp__alpha__read', 'mcp__beta__write']);
   const guard = host.guards[0];
-  assert.match(guard({ name: 'mcp__beta__write', agent }), /不属于当前工作区/);
+  assert.match(guard({ name: 'mcp__beta__write', agent }), /不在当前可见范围内/);
   assert.match(guard({ name: 'mcp__alpha__read', agent }), /未在当前会话激活/);
   host.dispose();
 });

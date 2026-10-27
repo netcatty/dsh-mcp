@@ -34,9 +34,11 @@ dozen servers cost one small schema instead of forty.
 - official client rows provisioned per server, so approvals, images, server
   instructions, auto-reconnect and pagination come from the Host
 - settings page and optional sidebar entry: server CRUD, search/sort,
-  enable/disable, reconnect, call panel, resources, a per-server count of tools
-  currently activated in live sessions (with the minutes left before they
-  expire), and one button that clears every session's activations
+  enable/disable, reconnect, call panel, resources, cross-server tool search, a
+  per-tool「禁用」switch (a disabled tool is hidden from the model, cannot be
+  activated and cannot be called), a per-server count of tools currently
+  activated in live sessions (with the minutes left before they expire), and one
+  button that clears every session's activations
 - one `/mcp` command (status, tools, search, call, activate, deactivate, diagnose, help)
 - OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
   refresh) for streamable-http servers
@@ -88,7 +90,8 @@ present):
         transport: stdio
         command: npx
         args: ['-y', '@modelcontextprotocol/server-filesystem', '/home/me/work']
-        # optional: enabled, env, cwd, toolCallTimeoutMs, workspaceIds: [<工作区 id>…]
+        # optional: enabled, env, cwd, toolCallTimeoutMs, workspaceIds: [<工作区 id>…],
+        #           disabledTools: [write_file]
       - name: remote
         transport: streamable-http
         url: https://mcp.example.com/mcp
