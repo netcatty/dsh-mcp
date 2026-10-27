@@ -78,11 +78,18 @@ few things change:
 ## Install
 
 ```sh
+# from npm (recommended for normal use)
+dsh plugin --profile web add @netcatty/dsh-mcp
+
+# from a git checkout, if you are hacking on it
+dsh plugin --profile web add github:netcatty/dsh-mcp
+
+# local development
 dsh plugin --profile web add link:/path/to/dsh-mcp
 ```
 
-Restart `dsh web` afterwards: the plugin now creates loader rows, which only
-take effect on a full restart.
+Restart `dsh web` afterwards: the plugin creates loader rows, which only take
+effect on a full restart.
 
 ## Configure
 
