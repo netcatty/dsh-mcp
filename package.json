@@ -1,6 +1,6 @@
 {
   "name": "@netcatty/dsh-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lazy MCP manager for DeepSeek Harness: provisions the official MCP client, keeps tool schemas out of context until a session activates them, plus /mcp commands and a settings page",
   "type": "module",
   "main": "lib/index.js",
