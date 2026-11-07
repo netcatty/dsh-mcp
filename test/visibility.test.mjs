@@ -143,6 +143,32 @@ test('a tool outside the Agent scope stays hidden and uncallable', () => {
   host.dispose();
 });
 
+test('a successful call renews the server window (sliding TTL)', () => {
+  const { host, visibility, state } = setup();
+  const agent = host.agents[0];
+  visibility.activate(agent, { server: 'alpha', ttlMinutes: 10 });
+  const first = visibility.status(agent).active[0].expiresAt;
+
+  state.at += 60_000;                 // 1 分钟后再调用一次
+  assert.equal(visibility.touch(agent, 'mcp__alpha__read'), true);
+  const renewed = visibility.status(agent).active[0].expiresAt;
+  assert.equal(renewed, first + 60_000);
+
+  // 未激活的工具不会续期
+  assert.equal(visibility.touch(agent, 'mcp__beta__write'), false);
+  host.dispose();
+});
+
+test('the ttl ceiling is configurable', () => {
+  const host = createFakeHost({ tools: TOOLS });
+  const visibility = createVisibility(host.ctx, { lazy: true, maxTtlMinutes: 240, now: () => 1000 });
+  visibility.mount({ agents: { list: () => host.agents }, on: () => () => {} });
+  const result = visibility.activate(host.agents[0], { server: 'alpha', ttlMinutes: 200 });
+  assert.equal(result.ttlMinutes, 200);
+  assert.throws(() => visibility.activate(host.agents[0], { server: 'alpha', ttlMinutes: 241 }), /1 到 240/);
+  host.dispose();
+});
+
 test('deactivation restores the hide set and lazy=false hides nothing', () => {
   const { host, visibility } = setup();
   const agent = host.agents[0];

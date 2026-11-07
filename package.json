@@ -9,7 +9,8 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "locale"
+    "locale",
+    "README.en.md"
   ],
   "dsh": {
     "bundle": {

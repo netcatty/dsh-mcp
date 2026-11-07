@@ -1,0 +1,215 @@
+# dsh-mcp
+
+Lazy MCP management for DeepSeek Harness. 中文说明见 [README.md](README.md).
+
+MCP itself runs on the official `@deepseek-ai/dsh-mcp-client`: this plugin turns
+every configured server into one official client row (transport, stdio
+processes, tool registration, approvals, images, instructions, reconnect and
+pagination stay with the Host), then keeps those tools' schemas **out of the
+session** until they are activated. One `mcp` router tool stays in context, so a
+dozen servers cost one small schema instead of forty.
+
+## How it works
+
+1. Each server in `settings.json` becomes loader row `dshmcp-<name>` running
+   `@deepseek-ai/dsh-mcp-client` (`lib/provision.js`).
+2. Every Agent scope gets `ctx.tools.restrict({deny: [...all mcp__ tools]})`, so
+   the model sees the tool names only after activation; a global
+   `ctx.tools.guard()` refuses execution outside the activation window
+   (`lib/visibility.js`).
+3. `mcp({action:"activate", server, tools})` lifts the mask for those exact
+   tools; the native `mcp__<server>__<tool>` schema enters context from the next
+   turn and is callable with full Host approval. Activations are memory-only,
+   per Agent, and renewed on every successful call; idle timeouts come from the
+   plugin's `settings.json` (default idle 30 minutes, ceiling 120).
+
+## Upgrading from 0.1
+
+0.2 moved MCP itself onto the official client and made tool schemas lazy, so a
+few things change:
+
+- **Restart `dsh web`.** The plugin now provisions loader rows; a page refresh is not enough.
+- **Files move automatically.** `~/.dsh/mcp-settings.json` and `~/.dsh/mcp-oauth.json` are migrated once into
+  `~/.dsh/dsh-plugins/dsh-mcp/` (dir 0700, files 0600). Nothing to do unless you had a custom path.
+- **Tools are hidden by default.** A session sees only the `mcp` router until it activates
+  something (`mcp({action:"activate"})` or `/mcp activate <server> [tool…]`); activations
+  expire after 30 minutes. Set `lazy: false` on the `mcp` row to keep the old always-on behaviour.
+- **Commands merged.** `/mcp-raw` is gone; everything is `/mcp` (`status`, `search`, `<server> tools`,
+  `<server> call`, `activate`, `deactivate`, `scope`, `diagnose`, `help`).
+- **New files** next to the settings: `snapshots/` (pre-write config snapshots) and `audit.jsonl`
+  (activations, calls, config changes).
+
+## Features
+
+- one `mcp` router tool: `servers`, `tools`, `search`, `describe`, `activate`,
+  `deactivate`, `status`, `refresh`
+- default-lazy: no MCP schema in context until activated; `lazy: false` restores
+  always-on tools
+- optional workspace scope per server (`workspaceIds`): a scoped server and its
+  tools exist only for sessions in one of those workspaces; an empty list means
+  global. The legacy single `workspaceId` is accepted and normalized into it
+- official client rows provisioned per server, so approvals, images, server
+  instructions, auto-reconnect and pagination come from the Host
+- settings page and optional sidebar entry: server CRUD, search/sort,
+  enable/disable, reconnect, call panel, resources (including templates, with a
+  prompt for the concrete URI), cross-server tool search, a
+  per-tool「禁用」switch (a disabled tool is hidden from the model, cannot be
+  activated and cannot be called), a per-server count of tools currently
+  activated in live sessions (with the minutes left before they expire), and one
+  button that clears every session's activations, per-server「复制」and header
+  「全部启用 / 全部停用」
+- one `/mcp` command (status, tools, search, call, activate, deactivate, diagnose, help)
+- OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
+  refresh) for streamable-http servers
+- a configuration snapshot before every write (edit, import, restore); the panel
+  lists them with their server names, diffs a snapshot against the live config
+  (added / removed / changed fields) and restores one in place
+- environment variables edited as key/value rows, optional 60 s automatic health
+  checks, and a call panel that remembers the last arguments/result per server
+- an audit trail of activations, deactivations, calls (with the result summary),
+  configuration changes, imports and restores, readable from the panel's「审计」view
+- `mcpServers` JSON import from the settings page (overwrite or skip existing
+  servers), and an export that can keep or redact secrets; a full document
+  (`{"mcpServers": {…}}`), a bare name→config map, or a single entry pasted as
+  `"name": {…}`; and exporting the whole document or any subset of servers in
+  that same fragment shape (several selected servers become a comma-separated
+  fragment list), with `env`/`headers` values replaced by `<REDACTED>` and `cwd`
+  by `<REDACTED:LOCAL_PATH>`
+
+## Install
+
+```sh
+# from npm (recommended for normal use)
+dsh plugin --profile web add @netcatty/dsh-mcp
+
+# from a git checkout, if you are hacking on it
+dsh plugin --profile web add github:netcatty/dsh-mcp
+
+# local development
+dsh plugin --profile web add link:/path/to/dsh-mcp
+```
+
+Restart `dsh web` afterwards: the plugin creates loader rows, which only take
+effect on a full restart.
+
+## Configure
+
+Every file this plugin owns lives in one directory,
+`$DSH_HOME/dsh-plugins/dsh-mcp/` (default `~/.dsh/dsh-plugins/dsh-mcp/`, dir
+0700, files 0600): `settings.json` for servers and the sidebar flag,
+`oauth.json` for OAuth grants, `snapshots/` for the automatic pre-write
+configuration snapshots (newest 20 kept), and `audit.jsonl` for the append-only
+event trail (rotated at 5 MiB). `$DSH_HOME/storages/` belongs to the storage
+backend (`dsh-storage-json`), so this author's plugins share one namespace
+instead: `$DSH_HOME/dsh-plugins/<plugin>/`. Files written by earlier versions
+(`~/.dsh/mcp-settings.json`, `~/.dsh/mcp-oauth.json`, `~/.dsh/dsh-mcp/`) are
+moved there once on the next start.
+
+The bundle patch inserts one `mcp` row. Edit it in the profile patch by id, or
+use the settings page (writes `settings.json`, which wins over the patch once
+present):
+
+```yaml
+- id: mcp
+  name: '@netcatty/dsh-mcp'
+  config:
+    lazy: true              # false = every MCP tool always visible
+    defaultTtlMinutes: 30   # activation lifetime, 1-30
+    servers:
+      - name: files
+        transport: stdio
+        command: npx
+        args: ['-y', '@modelcontextprotocol/server-filesystem', '/home/me/work']
+        # optional: enabled, env, cwd (also editable in the form), toolCallTimeoutMs,
+        #           workspaceIds: [<工作区 id>…],
+        #           disabledTools: [write_file]
+      - name: remote
+        transport: streamable-http
+        url: https://mcp.example.com/mcp
+        headers:
+          Authorization: Bearer ${TOKEN}
+        # optional: oauth: true, clientId: <id when the server has no dynamic registration>
+```
+
+Do not add hand-written `@deepseek-ai/dsh-mcp-client` rows for the same
+servers: this plugin owns the `mcp-*` prefix and removes stale rows on reload.
+
+## Model workflow
+
+```
+mcp({action:"servers"})                        # which servers, how many tools
+mcp({action:"tools", server:"files"})          # tool names
+mcp({action:"describe", server:"files", tool:"read_file"})
+mcp({action:"search", query:"screenshot"})     # across every enabled server
+mcp({action:"activate", server:"files", tools:["read_file"]})
+# next turn: mcp__files__read_file is callable as a normal tool
+mcp({action:"deactivate", server:"files"})     # drop it again
+```
+
+## Commands
+
+```
+/mcp                                  every server row
+/mcp search <query>               search registered MCP tools
+/mcp <server>                     one server's row
+/mcp <server> tools               tool names
+/mcp <server> call <tool> [json]  call through the official pipeline
+/mcp activate <server> [tool…]    activate tools for the receiving session
+/mcp deactivate <server>          hide that server's tools again
+/mcp deactivate                   hide everything in this session
+/mcp scope <server> global|here|id,id   change visibility (here = current workspace)
+```
+
+The command is read-only apart from activate/deactivate; the settings page is
+what edits configuration.
+
+### Sidebar entry
+
+Toggle「在侧边栏显示」in the settings page (stored in `settings.json` above),
+or set `showInSidebar: true` on the `mcp` row. The
+settings section and the 内置插件 tab are always registered.
+
+## OAuth
+
+Set `oauth: true` on a streamable-http server, restart, then click「登录」on its
+card. The browser walks the authorization-code flow; the callback lands on a
+one-shot `127.0.0.1` listener. Tokens are stored in
+`$DSH_HOME/dsh-plugins/dsh-mcp/oauth.json` (mode 0600) and refreshed
+automatically; the access token is injected as the
+`Authorization` header on the provisioned client row. `clientId` is only needed
+when the server does not support dynamic client registration.
+
+## Diagnose
+
+`/mcp diagnose [<server>]`, the「检查」button on a card, or「检查全部」in the
+header (which reports one summary line such as `2 台异常：dbx — command-missing`)
+reports only what it probed. For stdio it resolves the command on `PATH` (missing binary, not a dead
+process, is what it can tell). For streamable-http it makes one short request and
+classifies the outcome: `http-401/403` (bad credentials), `http-404` (wrong
+path), `http-5xx` (server error), `ECONNREFUSED` (nothing listening), `timeout`,
+`bad-port`, or `reachable` with the latency. A reachable endpoint still does not
+prove a working MCP session — the tool count does.
+
+## Governance boundary
+
+This plugin owns *visibility* and configuration: which servers exist, whether
+they are enabled, and which of their tools a session can see. Execution policy
+belongs to `dsh-guard`: it gates every tool call (allow / ask / deny, three-way
+approval) and now sees stable `mcp__<server>__<tool>` names, so per-tool rules
+live there instead of being duplicated here. Two execution policies in two
+plugins would only disagree.
+
+## Known limits
+
+- activation is per Agent and memory-only: a new session starts with everything
+  hidden, and a plugin restart clears activations
+- the model must call `mcp` before it can use a server's tools; a tool it never
+  activates is never visible
+- MCP prompt templates are not supported (the official client does not expose
+  them); resources are reachable through `@deepseek-ai/dsh-mcp-resources`
+- panel trials carry no Agent: a tool that needs approval (`ask`) is refused by
+  the Host. Activate it in a session and let the model call it instead
+- no project-level (per-cwd) server sets; configuration is global
+- OAuth was verified against a mock authorization server only; connecting such a
+  server's MCP endpoint with the Bearer token has not been exercised against a
+  real deployment

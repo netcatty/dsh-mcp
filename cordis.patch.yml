@@ -9,3 +9,5 @@
         servers: []
         lazy: true
         defaultTtlMinutes: 30
+        # 空闲多久失效；每次成功调用该服务器都会重新计时
+        maxTtlMinutes: 120

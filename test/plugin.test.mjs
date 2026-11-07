@@ -177,6 +177,27 @@ test('a disabled tool is listed as disabled, not activatable, not callable', asy
   host.dispose();
 });
 
+test('ttl settings come from the plugin settings file, not the patch row', async () => {
+  const host = createFakeHost({ tools: MCP_TOOLS });
+  const path = settingsPath();
+  const cfg = { settingsPath: path, servers: [{ name: 'fake', transport: 'stdio', command: process.execPath }], maxTtlMinutes: 30 };
+  await apply(host.ctx, cfg);
+  const definition = host.registered.get('mcp');
+  const agent = host.agents[0];
+
+  // patch value (30) applies on a fresh install
+  const first = await definition.execute({ action: 'activate', server: 'fake', ttlMinutes: 30 }, { agent });
+  assert.match(first.text, /30 分钟/);
+
+  // a number in the patch above the settings ceiling still wins until settings exist
+  const patched = createFakeHost({ tools: MCP_TOOLS });
+  await apply(patched.ctx, { ...cfg, maxTtlMinutes: 90 });
+  const wide = await patched.registered.get('mcp').execute({ action: 'activate', server: 'fake', ttlMinutes: 80 }, { agent: patched.agents[0] });
+  assert.match(wide.text, /80 分钟/);
+  patched.dispose();
+  host.dispose();
+});
+
 test('/mcp reports servers and their tools', async () => {
   const host = createFakeHost({ tools: MCP_TOOLS });
   await apply(host.ctx, {

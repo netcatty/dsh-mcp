@@ -1,214 +1,139 @@
 # dsh-mcp
 
-Lazy MCP management for DeepSeek Harness.
+DeepSeek Harness 的 MCP 管理器：懒加载注入 + 可视化管理。
 
-MCP itself runs on the official `@deepseek-ai/dsh-mcp-client`: this plugin turns
-every configured server into one official client row (transport, stdio
-processes, tool registration, approvals, images, instructions, reconnect and
-pagination stay with the Host), then keeps those tools' schemas **out of the
-session** until they are activated. One `mcp` router tool stays in context, so a
-dozen servers cost one small schema instead of forty.
+MCP 本体跑在官方的 `@deepseek-ai/dsh-mcp-client` 上——本插件把每台配置好的服务器变成一条官方客户端行（传输、stdio 子进程、工具注册、审批、图片、服务器指令、自动重连、分页全部由 Host 负责），然后把这些工具的 schema **挡在会话之外**，直到被激活。上下文里只留一个 `mcp` 路由工具，十几台服务器也只占一个小 schema。
 
-## How it works
+## 工作原理
 
-1. Each server in `settings.json` becomes loader row `dshmcp-<name>` running
-   `@deepseek-ai/dsh-mcp-client` (`lib/provision.js`).
-2. Every Agent scope gets `ctx.tools.restrict({deny: [...all mcp__ tools]})`, so
-   the model sees the tool names only after activation; a global
-   `ctx.tools.guard()` refuses execution outside the activation window
-   (`lib/visibility.js`).
-3. `mcp({action:"activate", server, tools})` lifts the mask for those exact
-   tools; the native `mcp__<server>__<tool>` schema enters context from the next
-   turn and is callable with full Host approval. Activations are memory-only,
-   per Agent, TTL 1–30 minutes (default 30).
+1. `settings.json` 里的每台服务器对应一条 loader 行 `dshmcp-<name>`，内容是 `@deepseek-ai/dsh-mcp-client`（见 `lib/provision.js`）。
+2. 每个 Agent 作用域都装一层 `ctx.tools.restrict({deny: [...全部 mcp__ 工具]})`，模型在激活前看不到工具；另有一个全局 `ctx.tools.guard()` 在激活窗口之外拒绝执行（见 `lib/visibility.js`）。
+3. `mcp({action:"activate", server, tools})` 只对指定的那几个工具解除遮挡；第 4 步起原生 `mcp__<server>__<tool>` schema 进入上下文，调用时照样走完整的 Host 审批。激活状态只存在内存里、按 Agent 隔离；窗口默认 30 分钟，上限可配（默认 120 分钟），**每次成功调用都会把该服务器的窗口重新计时**。
 
-## Upgrading from 0.1
+## 从 0.1 升级
 
-0.2 moved MCP itself onto the official client and made tool schemas lazy, so a
-few things change:
+0.2 把 MCP 本体交给了官方客户端，并改成懒加载，有几处行为变化：
 
-- **Restart `dsh web`.** The plugin now provisions loader rows; a page refresh is not enough.
-- **Files move automatically.** `~/.dsh/mcp-settings.json` and `~/.dsh/mcp-oauth.json` are migrated once into
-  `~/.dsh/dsh-plugins/dsh-mcp/` (dir 0700, files 0600). Nothing to do unless you had a custom path.
-- **Tools are hidden by default.** A session sees only the `mcp` router until it activates
-  something (`mcp({action:"activate"})` or `/mcp activate <server> [tool…]`); activations
-  expire after 30 minutes. Set `lazy: false` on the `mcp` row to keep the old always-on behaviour.
-- **Commands merged.** `/mcp-raw` is gone; everything is `/mcp` (`status`, `search`, `<server> tools`,
-  `<server> call`, `activate`, `deactivate`, `scope`, `diagnose`, `help`).
-- **New files** next to the settings: `snapshots/` (pre-write config snapshots) and `audit.jsonl`
-  (activations, calls, config changes).
+- **必须重启 `dsh web`**：插件现在会创建 loader 行，刷新页面不够。
+- **配置文件自动搬家**：`~/.dsh/mcp-settings.json` 和 `~/.dsh/mcp-oauth.json` 会在启动时一次性迁移到 `~/.dsh/dsh-plugins/dsh-mcp/`（目录 0700、文件 0600）。自定义过路径的除外。
+- **工具默认隐藏**：一个会话里只有 `mcp` 路由工具，直到它激活了别的东西（`mcp({action:"activate"})` 或 `/mcp activate <server> [tool…]`）。在 `mcp` 那行设 `lazy: false` 可以恢复旧的“始终可见”。
+- **命令合并**：`/mcp-raw` 已取消，所有操作都在 `/mcp` 下（`status`、`search`、`<server> tools`、`<server> call`、`activate`、`deactivate`、`scope`、`diagnose`、`help`）。
+- **新增文件**：配置文件旁边多了 `snapshots/`（每次写配置前的快照）和 `audit.jsonl`（激活、调用、配置变更记录）。
 
-## Features
+## 功能
 
-- one `mcp` router tool: `servers`, `tools`, `search`, `describe`, `activate`,
-  `deactivate`, `status`, `refresh`
-- default-lazy: no MCP schema in context until activated; `lazy: false` restores
-  always-on tools
-- optional workspace scope per server (`workspaceIds`): a scoped server and its
-  tools exist only for sessions in one of those workspaces; an empty list means
-  global. The legacy single `workspaceId` is accepted and normalized into it
-- official client rows provisioned per server, so approvals, images, server
-  instructions, auto-reconnect and pagination come from the Host
-- settings page and optional sidebar entry: server CRUD, search/sort,
-  enable/disable, reconnect, call panel, resources (including templates, with a
-  prompt for the concrete URI), cross-server tool search, a
-  per-tool「禁用」switch (a disabled tool is hidden from the model, cannot be
-  activated and cannot be called), a per-server count of tools currently
-  activated in live sessions (with the minutes left before they expire), and one
-  button that clears every session's activations, per-server「复制」and header
-  「全部启用 / 全部停用」
-- one `/mcp` command (status, tools, search, call, activate, deactivate, diagnose, help)
-- OAuth 2.0 login (discovery, dynamic registration, PKCE, loopback callback,
-  refresh) for streamable-http servers
-- a configuration snapshot before every write (edit, import, restore); the panel
-  lists them with their server names, diffs a snapshot against the live config
-  (added / removed / changed fields) and restores one in place
-- environment variables edited as key/value rows, optional 60 s automatic health
-  checks, and a call panel that remembers the last arguments/result per server
-- an audit trail of activations, deactivations, calls (with the result summary),
-  configuration changes, imports and restores, readable from the panel's「审计」view
-- `mcpServers` JSON import from the settings page (overwrite or skip existing
-  servers), and an export that can keep or redact secrets; a full document
-  (`{"mcpServers": {…}}`), a bare name→config map, or a single entry pasted as
-  `"name": {…}`; and exporting the whole document or any subset of servers in
-  that same fragment shape (several selected servers become a comma-separated
-  fragment list), with `env`/`headers` values replaced by `<REDACTED>` and `cwd`
-  by `<REDACTED:LOCAL_PATH>`
+- 一个 `mcp` 路由工具：`servers`、`tools`、`search`、`describe`、`activate`、`deactivate`、`status`、`refresh`
+- 默认懒加载：激活前上下文里没有 MCP schema；`lazy: false` 恢复“始终可见”
+- **调用即续期**：对某台服务器的任意一次成功调用，都会把它在该会话里的激活窗口重新计时，调试过程中不会半路失效；连续空闲到窗口结束才需要重新激活
+- 激活窗口可配：`defaultTtlMinutes`（默认 30）、`maxTtlMinutes`（默认 120）存在插件自己的 `settings.json`，在「设置 → 内置插件 → MCP」里直接改；也可在 `activate` 里用 `ttlMinutes` 指定本次窗口
+- 按服务器可选工作区（`workspaceIds`）：设置后只有这些工作区里的会话能看到、激活、调用它的工具；空列表表示全局。旧的单值 `workspaceId` 会被自动归一成数组
+- 每台服务器一条官方客户端行，审批、图片、服务器指令、自动重连、分页都由 Host 提供
+- 设置页（可选侧边栏入口）：服务器增删改、搜索排序、启停、重连、调用面板、资源（含模板，点击时提示填入具体 URI）、跨服务器工具搜索、每个工具的「禁用」开关（禁用的工具对模型隐藏、不可激活、不可调用）、每台服务器当前会话中的激活数（附剩余分钟）、一键清空全部会话激活、单台「复制」、标题栏「全部启用 / 全部停用」
+- 一个 `/mcp` 命令：状态、工具、搜索、调用、激活、停用、诊断、帮助
+- streamable-http 服务器的 OAuth 2.0 登录（自动发现、动态注册、PKCE、本地回环回调、刷新）
+- 每次写配置（编辑、导入、恢复）前自动快照；面板列出快照并可对比当前配置（新增 / 移除 / 字段变化）后就地恢复
+- 环境变量以键值行编辑；可选每 60 秒自动健康检查；调用面板记住每台服务器上次的参数与结果
+- 审计日志：激活、停用、调用（含结果摘要）、配置变更、导入、恢复，面板「审计」可查看
+- `mcpServers` JSON 导入（同名可覆盖或跳过）；导出可脱敏，可整份文档、名称→配置映射、单条片段 `"name": {…}`，也可任选多台导出为逗号分隔的片段列表（`env`/`headers` 值替换为 `<REDACTED>`，`cwd` 替换为 `<REDACTED:LOCAL_PATH>`）
 
-## Install
+## 安装
 
 ```sh
-# from npm (recommended for normal use)
+# 从 npm 安装（日常使用推荐）
 dsh plugin --profile web add @netcatty/dsh-mcp
 
-# from a git checkout, if you are hacking on it
+# 从 git 仓库安装（想跟最新代码时）
 dsh plugin --profile web add github:netcatty/dsh-mcp
 
-# local development
+# 本地开发
 dsh plugin --profile web add link:/path/to/dsh-mcp
 ```
 
-Restart `dsh web` afterwards: the plugin creates loader rows, which only take
-effect on a full restart.
+装完要**重启 `dsh web`**：插件会创建 loader 行，只有完整重启才生效。
 
-## Configure
+## 配置
 
-Every file this plugin owns lives in one directory,
-`$DSH_HOME/dsh-plugins/dsh-mcp/` (default `~/.dsh/dsh-plugins/dsh-mcp/`, dir
-0700, files 0600): `settings.json` for servers and the sidebar flag,
-`oauth.json` for OAuth grants, `snapshots/` for the automatic pre-write
-configuration snapshots (newest 20 kept), and `audit.jsonl` for the append-only
-event trail (rotated at 5 MiB). `$DSH_HOME/storages/` belongs to the storage
-backend (`dsh-storage-json`), so this author's plugins share one namespace
-instead: `$DSH_HOME/dsh-plugins/<plugin>/`. Files written by earlier versions
-(`~/.dsh/mcp-settings.json`, `~/.dsh/mcp-oauth.json`, `~/.dsh/dsh-mcp/`) are
-moved there once on the next start.
+插件自己的所有文件都在一个目录：`$DSH_HOME/dsh-plugins/dsh-mcp/`（默认 `~/.dsh/dsh-plugins/dsh-mcp/`，目录 0700、文件 0600）——`settings.json` 存服务器列表与侧边栏开关，`oauth.json` 存 OAuth 凭据，`snapshots/` 存写配置前的快照（保留最近 20 份），`audit.jsonl` 存事件流水（5 MiB 轮转）。旧版本写在其他位置的文件会在启动时一次性迁移过来。
 
-The bundle patch inserts one `mcp` row. Edit it in the profile patch by id, or
-use the settings page (writes `settings.json`, which wins over the patch once
-present):
+bundle patch 只插入一行 `mcp`。可以在 profile patch 里按 id 改，也可以用设置页（写 `settings.json`，一旦存在就优先于 patch）：
 
 ```yaml
 - id: mcp
   name: '@netcatty/dsh-mcp'
   config:
-    lazy: true              # false = every MCP tool always visible
-    defaultTtlMinutes: 30   # activation lifetime, 1-30
+    lazy: true              # false = MCP 工具始终可见
+    defaultTtlMinutes: 30   # 仅为新装兜底；实际值存在 settings.json，设置页可改
+    maxTtlMinutes: 120      # 同上，单次 activate 能申请的上限
     servers:
       - name: files
         transport: stdio
         command: npx
         args: ['-y', '@modelcontextprotocol/server-filesystem', '/home/me/work']
-        # optional: enabled, env, cwd (also editable in the form), toolCallTimeoutMs,
-        #           workspaceIds: [<工作区 id>…],
-        #           disabledTools: [write_file]
+        # 可选：enabled、env、cwd（表单里也可填）、toolCallTimeoutMs、
+        #       workspaceIds: [<工作区 id>…]、disabledTools: [write_file]
       - name: remote
         transport: streamable-http
         url: https://mcp.example.com/mcp
         headers:
           Authorization: Bearer ${TOKEN}
-        # optional: oauth: true, clientId: <id when the server has no dynamic registration>
+        # 可选：oauth: true、clientId: <服务器不支持动态注册时填>
 ```
 
-Do not add hand-written `@deepseek-ai/dsh-mcp-client` rows for the same
-servers: this plugin owns the `mcp-*` prefix and removes stale rows on reload.
+不要为同一台服务器再手写 `@deepseek-ai/dsh-mcp-client` 行：`dshmcp-` 前缀归本插件所有，重载时会清掉失效的行。
 
-## Model workflow
+## 模型侧用法
 
 ```
-mcp({action:"servers"})                        # which servers, how many tools
-mcp({action:"tools", server:"files"})          # tool names
+mcp({action:"servers"})                        # 有哪些服务器、各多少工具
+mcp({action:"tools", server:"files"})          # 工具名
 mcp({action:"describe", server:"files", tool:"read_file"})
-mcp({action:"search", query:"screenshot"})     # across every enabled server
-mcp({action:"activate", server:"files", tools:["read_file"]})
-# next turn: mcp__files__read_file is callable as a normal tool
-mcp({action:"deactivate", server:"files"})     # drop it again
+mcp({action:"search", query:"screenshot"})     # 跨所有已启用服务器
+mcp({action:"activate", server:"files", tools:["read_file"], ttlMinutes: 120})
+# 下一轮起：mcp__files__read_file 可以像普通工具一样调用
+mcp({action:"deactivate", server:"files"})     # 收回
 ```
 
-## Commands
+激活期间只要还在调用这台服务器的工具，窗口就会自动续期，不需要模型自己惦记“快到期了”。
+
+## 命令
 
 ```
-/mcp                                  every server row
-/mcp search <query>               search registered MCP tools
-/mcp <server>                     one server's row
-/mcp <server> tools               tool names
-/mcp <server> call <tool> [json]  call through the official pipeline
-/mcp activate <server> [tool…]    activate tools for the receiving session
-/mcp deactivate <server>          hide that server's tools again
-/mcp deactivate                   hide everything in this session
-/mcp scope <server> global|here|id,id   change visibility (here = current workspace)
+/mcp                                  每台服务器一行
+/mcp search <关键词>                   搜已注册的 MCP 工具
+/mcp <server>                         单台服务器
+/mcp <server> tools                   工具名
+/mcp <server> call <tool> [json]      经官方管线调用一次
+/mcp activate <server> [tool…]        为当前会话激活（省略 tool 就整台）
+/mcp deactivate <server>              收回该服务器的工具
+/mcp deactivate                       清空本会话的全部激活
+/mcp scope <server> global|here|id,id 改可见范围（here = 当前工作区）
+/mcp diagnose [<server>]              探测命令/端点（省略则检查全部）
+/mcp help                             命令列表
 ```
 
-The command is read-only apart from activate/deactivate; the settings page is
-what edits configuration.
+除 `activate` / `deactivate` / `scope` 外，命令都是只读的；改配置请用设置页。
 
-### Sidebar entry
+### 侧边栏入口
 
-Toggle「在侧边栏显示」in the settings page (stored in `settings.json` above),
-or set `showInSidebar: true` on the `mcp` row. The
-settings section and the 内置插件 tab are always registered.
+在设置页勾选「在侧边栏显示」（存在上面的 `settings.json` 里），或在 `mcp` 行设 `showInSidebar: true`。设置分区和「内置插件」页里的标签始终注册。
 
 ## OAuth
 
-Set `oauth: true` on a streamable-http server, restart, then click「登录」on its
-card. The browser walks the authorization-code flow; the callback lands on a
-one-shot `127.0.0.1` listener. Tokens are stored in
-`$DSH_HOME/dsh-plugins/dsh-mcp/oauth.json` (mode 0600) and refreshed
-automatically; the access token is injected as the
-`Authorization` header on the provisioned client row. `clientId` is only needed
-when the server does not support dynamic client registration.
+在 streamable-http 服务器上设 `oauth: true`，重启后点它卡片上的「登录」。浏览器走授权码流程，回调落在一次性的 `127.0.0.1` 监听上。Token 存在 `$DSH_HOME/dsh-plugins/dsh-mcp/oauth.json`（0600），自动刷新，access token 会作为 `Authorization` 头注入到该服务器对应的客户端行。只有服务器不支持动态注册时才需要填 `clientId`。
 
-## Diagnose
+## 诊断
 
-`/mcp diagnose [<server>]`, the「检查」button on a card, or「检查全部」in the
-header (which reports one summary line such as `2 台异常：dbx — command-missing`)
-reports only what it probed. For stdio it resolves the command on `PATH` (missing binary, not a dead
-process, is what it can tell). For streamable-http it makes one short request and
-classifies the outcome: `http-401/403` (bad credentials), `http-404` (wrong
-path), `http-5xx` (server error), `ECONNREFUSED` (nothing listening), `timeout`,
-`bad-port`, or `reachable` with the latency. A reachable endpoint still does not
-prove a working MCP session — the tool count does.
+`/mcp diagnose [<server>]`、卡片上的「检查」、或者标题栏的「检查全部」（跑完给一行汇总，例如 `2 台异常：dbx — command-missing`）只报告真正探测到的东西。stdio 只解析 `PATH` 上的命令（能告诉你的只有“命令找不到”，而不是“进程死了”）；streamable-http 发一次短请求，归类为 `http-401/403`（凭据问题）、`http-404`（路径错）、`http-5xx`（服务端错误）、`ECONNREFUSED`（端口没人监听）、`timeout`、`bad-port` 或 `reachable`（附耗时）。端点可达不等于 MCP 会话可用——那要看工具数。
 
-## Governance boundary
+## 与治理的分界
 
-This plugin owns *visibility* and configuration: which servers exist, whether
-they are enabled, and which of their tools a session can see. Execution policy
-belongs to `dsh-guard`: it gates every tool call (allow / ask / deny, three-way
-approval) and now sees stable `mcp__<server>__<tool>` names, so per-tool rules
-live there instead of being duplicated here. Two execution policies in two
-plugins would only disagree.
+本插件管**可见性与配置**：有哪些服务器、是否启用、某个会话能看到哪些工具。执行期策略归 `dsh-guard`：它在每次工具调用前做 allow / ask / deny（含三选项审批），而且现在能看到稳定的 `mcp__<server>__<tool>` 名字，所以按工具的规则应该写在那里，而不是在这里重复一套。两套执行策略并存只会互相打架。
 
-## Known limits
+## 已知限制
 
-- activation is per Agent and memory-only: a new session starts with everything
-  hidden, and a plugin restart clears activations
-- the model must call `mcp` before it can use a server's tools; a tool it never
-  activates is never visible
-- MCP prompt templates are not supported (the official client does not expose
-  them); resources are reachable through `@deepseek-ai/dsh-mcp-resources`
-- panel trials carry no Agent: a tool that needs approval (`ask`) is refused by
-  the Host. Activate it in a session and let the model call it instead
-- no project-level (per-cwd) server sets; configuration is global
-- OAuth was verified against a mock authorization server only; connecting such a
-  server's MCP endpoint with the Bearer token has not been exercised against a
-  real deployment
+- 激活按 Agent 存在内存里：新会话从全隐藏开始，插件重启会清空激活；续期只在调用时发生，纯空闲超过窗口仍会失效
+- 模型必须先调 `mcp` 才能用服务器工具；没激活过的工具永远不可见
+- 不支持 MCP 提示词模板（官方客户端不暴露）；资源通过 `@deepseek-ai/dsh-mcp-resources` 访问
+- 面板试调用不带 Agent：需要审批（`ask`）的工具会被 Host 拒绝。这类工具请在会话里激活后让模型调用
+- 没有项目级（按 cwd）服务器集合，配置是全局的
+- OAuth 只用模拟授权服务器验证过，尚未对真实部署用 Bearer token 打通 MCP 端点
