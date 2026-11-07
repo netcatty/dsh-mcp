@@ -177,6 +177,19 @@ test('a disabled tool is listed as disabled, not activatable, not callable', asy
   host.dispose();
 });
 
+test('the call route settles one call through the batch executor', async () => {
+  const host = createFakeHost({ tools: MCP_TOOLS });
+  await apply(host.ctx, {
+    settingsPath: settingsPath(),
+    servers: [{ name: 'fake', transport: 'stdio', command: process.execPath }],
+  });
+  const command = host.commands.find((item) => item.name === 'mcp');
+  const out = await command.handler({ rawInput: 'fake call echo {"text":"hi"}' });
+  assert.equal(out.kind, 'success');
+  assert.match(out.text, /mcp__fake__echo/);
+  host.dispose();
+});
+
 test('ttl settings come from the plugin settings file, not the patch row', async () => {
   const host = createFakeHost({ tools: MCP_TOOLS });
   const path = settingsPath();

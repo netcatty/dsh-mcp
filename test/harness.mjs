@@ -79,11 +79,22 @@ export function createFakeHost({ tools = [], agents: agentCount = 1, workspaces 
       view() {
         return { visible: new Map(hostTools), knownNames: new Set(hostTools.keys()), restrictableNames: new Set(hostTools.keys()) };
       },
-      async execute({ name, arguments: args, signal }) {
-        // The real registry reads exec.signal and crashes without it; keep that
-        // contract in the fake so a caller that forgets one fails here.
+      async execute({ calls, signal }) {
+        // The real registry settles a BATCH of model calls: `{calls, signal}`.
+        // A single `{callId, name, …}` object is rejected as a malformed batch.
         if (signal === undefined) throw new Error("Cannot read properties of undefined (reading 'aborted')");
-        return { content: [{ type: 'text', text: `${name} ${JSON.stringify(args)}` }], value: null };
+        if (!Array.isArray(calls)) throw new Error('Tool batch execution failed');
+        return {
+          results: calls.map((call) => ({
+            callId: call.id,
+            result: {
+              content: [{ type: 'text', text: `${call.name} ${call.arguments}` }],
+              value: null,
+            },
+          })),
+          additionalContexts: [],
+          concluded: false,
+        };
       },
     },
     loader: {
