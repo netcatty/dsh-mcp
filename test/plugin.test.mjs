@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { apply } from '../lib/index.js';
 import { recent as recentAudit } from '../lib/audit.js';
 import { createFakeHost } from './harness.mjs';
@@ -208,6 +208,28 @@ test('ttl settings come from the plugin settings file, not the patch row', async
   const wide = await patched.registered.get('mcp').execute({ action: 'activate', server: 'fake', ttlMinutes: 80 }, { agent: patched.agents[0] });
   assert.match(wide.text, /80 分钟/);
   patched.dispose();
+  host.dispose();
+});
+
+test('editing settings.json applies the ttl ceiling without a restart', async () => {
+  const host = createFakeHost({ tools: MCP_TOOLS });
+  const path = settingsPath();
+  await apply(host.ctx, { settingsPath: path, servers: [{ name: 'fake', transport: 'stdio', command: process.execPath }] });
+  const definition = host.registered.get('mcp');
+  const agent = host.agents[0];
+
+  await definition.execute({ action: 'activate', server: 'fake', ttlMinutes: 100 }, { agent }); // 默认上限 120
+  // 手改文件把上限压到 60（文件可能尚未创建，直接写完整内容）
+  const existing = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
+  writeFileSync(path, JSON.stringify({
+    ...existing,
+    servers: [{ name: 'fake', transport: 'stdio', command: process.execPath }],
+    maxTtlMinutes: 60,
+  }, null, 2));
+  await assert.rejects(
+    definition.execute({ action: 'activate', server: 'fake', ttlMinutes: 100 }, { agent }),
+    /1 到 60/,
+  );
   host.dispose();
 });
 

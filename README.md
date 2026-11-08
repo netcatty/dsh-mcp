@@ -25,7 +25,7 @@ MCP 本体跑在官方的 `@deepseek-ai/dsh-mcp-client` 上——本插件把每
 - 一个 `mcp` 路由工具：`servers`、`tools`、`search`、`describe`、`activate`、`deactivate`、`status`、`refresh`
 - 默认懒加载：激活前上下文里没有 MCP schema；`lazy: false` 恢复“始终可见”
 - **调用即续期**：对某台服务器的任意一次成功调用，都会把它在该会话里的激活窗口重新计时，调试过程中不会半路失效；连续空闲到窗口结束才需要重新激活
-- 激活窗口可配：`defaultTtlMinutes`（默认 30）、`maxTtlMinutes`（默认 120）存在插件自己的 `settings.json`，在「设置 → 内置插件 → MCP」里直接改；也可在 `activate` 里用 `ttlMinutes` 指定本次窗口
+- 激活窗口可配：`defaultTtlMinutes`（默认 30）、`maxTtlMinutes`（默认 120）存在插件自己的 `settings.json`，在「设置 → 内置插件 → MCP」里直接改；手动编辑该文件也会在下次 activate 时自动生效，无需重启。也可在 `activate` 里用 `ttlMinutes` 指定本次窗口
 - 按服务器可选工作区（`workspaceIds`）：设置后只有这些工作区里的会话能看到、激活、调用它的工具；空列表表示全局。旧的单值 `workspaceId` 会被自动归一成数组
 - 每台服务器一条官方客户端行，审批、图片、服务器指令、自动重连、分页都由 Host 提供
 - 设置页（可选侧边栏入口）：服务器增删改、搜索排序、启停、重连、调用面板、资源（含模板，点击时提示填入具体 URI）、跨服务器工具搜索、每个工具的「禁用」开关（禁用的工具对模型隐藏、不可激活、不可调用）、每台服务器当前会话中的激活数（附剩余分钟）、一键清空全部会话激活、单台「复制」、标题栏「全部启用 / 全部停用」
