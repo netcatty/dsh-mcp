@@ -2,7 +2,7 @@
 // scope with `tools.restrict`, and command registration. Tests assert against
 // the same seams the real Host exposes.
 
-export function createFakeHost({ tools = [], agents: agentCount = 1, workspaces = [] } = {}) {
+export function createFakeHost({ tools = [], agents: agentCount = 1, workspaces = [], onCreate } = {}) {
   const registered = new Map();
   const hostTools = new Map(tools.map((tool) => [tool.name, tool]));
   const guards = [];
@@ -12,6 +12,7 @@ export function createFakeHost({ tools = [], agents: agentCount = 1, workspaces 
   const effects = [];
   const loaderStore = {};
   const loaderCalls = [];
+  const entryTools = new Map();
 
   const agentLayers = new Map();
   const squash = (layers) => {
@@ -102,6 +103,12 @@ export function createFakeHost({ tools = [], agents: agentCount = 1, workspaces 
       async create(entry) {
         loaderCalls.push(['create', entry.id, entry]);
         loaderStore[entry.id] = { options: { name: entry.name, config: entry.config, disabled: entry.disabled === true } };
+        // A real client registers its tools while mounting; tests use this hook
+        // to simulate a server that comes up with tools. Its rows go away again
+        // when the row is removed, just as an unloaded plugin unregisters them.
+        const before = new Set(hostTools.keys());
+        onCreate?.(entry, hostTools);
+        entryTools.set(entry.id, [...hostTools.keys()].filter((name) => !before.has(name)));
         return entry.id;
       },
       async update(id, patch) {
@@ -124,6 +131,8 @@ export function createFakeHost({ tools = [], agents: agentCount = 1, workspaces 
       remove(id) {
         loaderCalls.push(['remove', id]);
         delete loaderStore[id];
+        for (const name of entryTools.get(id) ?? []) hostTools.delete(name);
+        entryTools.delete(id);
       },
     },
   };

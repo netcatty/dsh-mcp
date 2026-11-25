@@ -97,9 +97,10 @@ effect on a full restart.
 Every file this plugin owns lives in one directory,
 `$DSH_HOME/dsh-plugins/dsh-mcp/` (default `~/.dsh/dsh-plugins/dsh-mcp/`, dir
 0700, files 0600): `settings.json` for servers and the sidebar flag,
-`oauth.json` for OAuth grants, `snapshots/` for the automatic pre-write
-configuration snapshots (newest 20 kept), and `audit.jsonl` for the append-only
-event trail (rotated at 5 MiB). `$DSH_HOME/storages/` belongs to the storage
+`oauth.json` for OAuth grants, `catalog.json` for each server's tools as of its
+last connection, `snapshots/` for the automatic pre-write configuration
+snapshots (newest 20 kept), and `audit.jsonl` for the append-only event trail
+(rotated at 5 MiB). `$DSH_HOME/storages/` belongs to the storage
 backend (`dsh-storage-json`), so this author's plugins share one namespace
 instead: `$DSH_HOME/dsh-plugins/<plugin>/`. Files written by earlier versions
 (`~/.dsh/mcp-settings.json`, `~/.dsh/mcp-oauth.json`, `~/.dsh/dsh-mcp/`) are
@@ -114,13 +115,16 @@ present):
   name: '@netcatty/dsh-mcp'
   config:
     lazy: true              # false = every MCP tool always visible
+    lazyConnect: true       # true = connect on first activate/enable (default)
+    connectTimeoutMs: 30000 # how long a connection may take to register tools
     defaultTtlMinutes: 30   # activation lifetime, 1-30
     servers:
       - name: files
         transport: stdio
         command: npx
         args: ['-y', '@modelcontextprotocol/server-filesystem', '/home/me/work']
-        # optional: enabled, env, cwd (also editable in the form), toolCallTimeoutMs,
+        # optional: enabled, autostart: true (skip lazy connect for this server),
+        #           env, cwd (also editable in the form), toolCallTimeoutMs,
         #           workspaceIds: [<工作区 id>…],
         #           disabledTools: [write_file]
       - name: remote
@@ -131,19 +135,35 @@ present):
         # optional: oauth: true, clientId: <id when the server has no dynamic registration>
 ```
 
+### Lazy connections (default)
+
+No MCP client is mounted while the session boots. The first `activate` /
+`enable` / `refresh` for a server connects it, then waits up to
+`connectTimeoutMs` for its tools to register. A failure shows as the `error`
+status in `servers`; `diagnose` goes further.
+
+- While disconnected, `servers` / `tools` / `search` / `describe` read
+  `catalog.json` (the tools from the last connection) and say so.
+- To connect at boot again: `lazyConnect: false`, or `autostart: true` on the
+  servers that need it.
+- `lazy: false` (every tool always visible) forces boot connections, since
+  otherwise the first turn would see no MCP tools.
+
 Do not add hand-written `@deepseek-ai/dsh-mcp-client` rows for the same
 servers: this plugin owns the `mcp-*` prefix and removes stale rows on reload.
 
 ## Model workflow
 
 ```
-mcp({action:"servers"})                        # which servers, how many tools
-mcp({action:"tools", server:"files"})          # tool names
+mcp({action:"servers"})                        # servers, their state and tool counts
+mcp({action:"tools", server:"files"})          # tool names (from the catalogue when idle)
 mcp({action:"describe", server:"files", tool:"read_file"})
-mcp({action:"search", query:"screenshot"})     # across every enabled server
+mcp({action:"search", query:"screenshot"})     # across every server, cached ones included
 mcp({action:"activate", server:"files", tools:["read_file"]})
-# next turn: mcp__files__read_file is callable as a normal tool
+# connects first if idle; next turn: mcp__files__read_file is callable
 mcp({action:"deactivate", server:"files"})     # drop it again
+mcp({action:"enable", server:"files"})         # connect only, no activation
+mcp({action:"disable", server:"files"})        # disconnect (config untouched; next activate reconnects)
 ```
 
 ## Commands
@@ -154,13 +174,15 @@ mcp({action:"deactivate", server:"files"})     # drop it again
 /mcp <server>                     one server's row
 /mcp <server> tools               tool names
 /mcp <server> call <tool> [json]  call through the official pipeline
-/mcp activate <server> [tool…]    activate tools for the receiving session
+/mcp activate <server> [tool…]    activate tools for the receiving session (connects first)
 /mcp deactivate <server>          hide that server's tools again
 /mcp deactivate                   hide everything in this session
+/mcp enable <server>              connect now, without activating
+/mcp disable <server>             disconnect; configuration is untouched
 /mcp scope <server> global|here|id,id   change visibility (here = current workspace)
 ```
 
-The command is read-only apart from activate/deactivate; the settings page is
+The command is read-only apart from activate/deactivate/enable/disable; the settings page is
 what edits configuration.
 
 ### Sidebar entry

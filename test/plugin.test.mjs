@@ -24,6 +24,8 @@ test('provisions one official client row per server and hides its tools by defau
   const host = createFakeHost({ tools: MCP_TOOLS });
   await apply(host.ctx, {
     settingsPath: settingsPath(),
+    // Boot-time provisioning is the eager mode; lazy connections are the default.
+    lazyConnect: false,
     servers: [{ name: 'fake', transport: 'stdio', command: process.execPath, args: ['server.mjs'] }],
   });
 
@@ -237,6 +239,7 @@ test('/mcp reports servers and their tools', async () => {
   const host = createFakeHost({ tools: MCP_TOOLS });
   await apply(host.ctx, {
     settingsPath: settingsPath(),
+    lazyConnect: false,
     servers: [{ name: 'fake', transport: 'stdio', command: process.execPath }],
   });
   const command = host.commands.find((item) => item.name === 'mcp');
@@ -262,5 +265,65 @@ test('/mcp reports servers and their tools', async () => {
   assert.equal((await command.handler({ rawInput: 'activate', agent })).kind, 'error');
   assert.match((await command.handler({ rawInput: 'help' })).text, /\/mcp activate <server>/);
   assert.equal((await command.handler({ rawInput: 'nope tools' })).kind, 'error');
+  host.dispose();
+});
+
+test('lazy boot mounts nothing; activate connects, disable unmounts, tools stay listed from the catalogue', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-lazy-'));
+  const host = createFakeHost({
+    onCreate: (_entry, tools) => {
+      for (const tool of MCP_TOOLS) tools.set(tool.name, tool);
+    },
+  });
+  await apply(host.ctx, {
+    settingsPath: join(dir, 'settings.json'),
+    catalogPath: join(dir, 'catalog.json'),
+    servers: [{ name: 'fake', transport: 'stdio', command: process.execPath }],
+  });
+
+  assert.equal(host.loaderCalls.length, 0, 'lazy boot must not mount a client');
+  const definition = host.registered.get('mcp');
+  const agent = host.agents[0];
+
+  assert.match((await definition.execute({ action: 'servers' }, { agent })).text, /fake \[idle\]/);
+  assert.match((await definition.execute({ action: 'tools', server: 'fake' }, { agent })).text, /没有可用工具/);
+
+  const activated = await definition.execute({ action: 'activate', server: 'fake', tools: ['echo'] }, { agent });
+  assert.match(activated.text, /已激活/);
+  assert.equal(host.loaderCalls.filter((call) => call[0] === 'create').length, 1);
+
+  await definition.execute({ action: 'disable', server: 'fake' }, { agent });
+  assert.equal(host.loaderCalls.filter((call) => call[0] === 'remove').length, 1);
+  assert.match((await definition.execute({ action: 'servers' }, { agent })).text, /fake \[idle\]/);
+
+  const cached = await definition.execute({ action: 'tools', server: 'fake' }, { agent });
+  assert.match(cached.text, /来自上次连接的工具目录/);
+  assert.match(cached.text, /echo/);
+  assert.equal(JSON.parse((await definition.execute({ action: 'describe', server: 'fake', tool: 'sum' }, { agent })).text).cached, true);
+
+  await definition.execute({ action: 'enable', server: 'fake' }, { agent });
+  assert.match((await definition.execute({ action: 'servers' }, { agent })).text, /fake \[connected\]/);
+  host.dispose();
+});
+
+test('autostart:true opts one server back into a boot connection', async () => {
+  const host = createFakeHost({
+    onCreate: (entry, tools) => {
+      const name = `mcp__${entry.config.serverName}__ping`;
+      tools.set(name, { name, description: 'ping' });
+    },
+  });
+  await apply(host.ctx, {
+    settingsPath: settingsPath(),
+    servers: [
+      { name: 'eager', transport: 'stdio', command: process.execPath, autostart: true },
+      { name: 'later', transport: 'stdio', command: process.execPath },
+    ],
+  });
+  const created = host.loaderCalls.filter((call) => call[0] === 'create').map((call) => call[1]);
+  assert.deepEqual(created, ['dshmcp-eager']);
+  const rows = (await host.registered.get('mcp').execute({ action: 'servers' })).text;
+  assert.match(rows, /eager \[connected\]/);
+  assert.match(rows, /later \[idle\]/);
   host.dispose();
 });

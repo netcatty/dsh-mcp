@@ -53,7 +53,7 @@ dsh plugin --profile web add link:/path/to/dsh-mcp
 
 ## 配置
 
-插件自己的所有文件都在一个目录：`$DSH_HOME/dsh-plugins/dsh-mcp/`（默认 `~/.dsh/dsh-plugins/dsh-mcp/`，目录 0700、文件 0600）——`settings.json` 存服务器列表与侧边栏开关，`oauth.json` 存 OAuth 凭据，`snapshots/` 存写配置前的快照（保留最近 20 份），`audit.jsonl` 存事件流水（5 MiB 轮转）。旧版本写在其他位置的文件会在启动时一次性迁移过来。
+插件自己的所有文件都在一个目录：`$DSH_HOME/dsh-plugins/dsh-mcp/`（默认 `~/.dsh/dsh-plugins/dsh-mcp/`，目录 0700、文件 0600）——`settings.json` 存服务器列表与侧边栏开关，`oauth.json` 存 OAuth 凭据，`catalog.json` 存每台服务器上次连接时的工具目录，`snapshots/` 存写配置前的快照（保留最近 20 份），`audit.jsonl` 存事件流水（5 MiB 轮转）。旧版本写在其他位置的文件会在启动时一次性迁移过来。
 
 bundle patch 只插入一行 `mcp`。可以在 profile patch 里按 id 改，也可以用设置页（写 `settings.json`，一旦存在就优先于 patch）：
 
@@ -62,6 +62,8 @@ bundle patch 只插入一行 `mcp`。可以在 profile patch 里按 id 改，也
   name: '@netcatty/dsh-mcp'
   config:
     lazy: true              # false = MCP 工具始终可见
+    lazyConnect: true       # true = 启动不连接，首次 activate/enable 再连（默认）
+    connectTimeoutMs: 30000 # 连接后等工具注册的上限
     defaultTtlMinutes: 30   # 仅为新装兜底；实际值存在 settings.json，设置页可改
     maxTtlMinutes: 120      # 同上，单次 activate 能申请的上限
     servers:
@@ -69,7 +71,8 @@ bundle patch 只插入一行 `mcp`。可以在 profile patch 里按 id 改，也
         transport: stdio
         command: npx
         args: ['-y', '@modelcontextprotocol/server-filesystem', '/home/me/work']
-        # 可选：enabled、env、cwd（表单里也可填）、toolCallTimeoutMs、
+        # 可选：enabled、autostart: true（跳过懒连接，启动就挂这台）、env、
+        #       cwd（表单里也可填）、toolCallTimeoutMs、
         #       workspaceIds: [<工作区 id>…]、disabledTools: [write_file]
       - name: remote
         transport: streamable-http
@@ -79,18 +82,28 @@ bundle patch 只插入一行 `mcp`。可以在 profile patch 里按 id 改，也
         # 可选：oauth: true、clientId: <服务器不支持动态注册时填>
 ```
 
+### 懒连接（默认）
+
+启动时不挂任何 MCP client。第一次 `activate` / `enable` / `refresh` 某台服务器时才去连，连上后按 `connectTimeoutMs` 等它的工具注册完成。连接失败会落在 `servers` 的 `error` 状态里，`diagnose` 继续排查。
+
+- 断开期间 `servers` / `tools` / `search` / `describe` 读 `catalog.json`（上次连接时的工具目录），结果标注“缓存”。
+- 想恢复“启动即连”：整体设 `lazyConnect: false`，或只给某台加 `autostart: true`。
+- `lazy: false`（工具始终可见）会强制启动即连，否则第一轮没有任何 MCP 工具可见。
+
 不要为同一台服务器再手写 `@deepseek-ai/dsh-mcp-client` 行：`dshmcp-` 前缀归本插件所有，重载时会清掉失效的行。
 
 ## 模型侧用法
 
 ```
-mcp({action:"servers"})                        # 有哪些服务器、各多少工具
-mcp({action:"tools", server:"files"})          # 工具名
+mcp({action:"servers"})                        # 有哪些服务器、当前状态与工具数
+mcp({action:"tools", server:"files"})          # 工具名（未连接时来自缓存目录）
 mcp({action:"describe", server:"files", tool:"read_file"})
-mcp({action:"search", query:"screenshot"})     # 跨所有已启用服务器
+mcp({action:"search", query:"screenshot"})     # 跨所有服务器，未连接的读缓存
 mcp({action:"activate", server:"files", tools:["read_file"], ttlMinutes: 120})
-# 下一轮起：mcp__files__read_file 可以像普通工具一样调用
+# 未连接会先连；下一轮起：mcp__files__read_file 可以像普通工具一样调用
 mcp({action:"deactivate", server:"files"})     # 收回
+mcp({action:"enable", server:"files"})         # 只连接，不激活
+mcp({action:"disable", server:"files"})        # 断开（不改配置，下次 activate 重连）
 ```
 
 激活期间只要还在调用这台服务器的工具，窗口就会自动续期，不需要模型自己惦记“快到期了”。
@@ -103,15 +116,17 @@ mcp({action:"deactivate", server:"files"})     # 收回
 /mcp <server>                         单台服务器
 /mcp <server> tools                   工具名
 /mcp <server> call <tool> [json]      经官方管线调用一次
-/mcp activate <server> [tool…]        为当前会话激活（省略 tool 就整台）
+/mcp activate <server> [tool…]        为当前会话激活（省略 tool 就整台；未连接会先连）
 /mcp deactivate <server>              收回该服务器的工具
 /mcp deactivate                       清空本会话的全部激活
+/mcp enable <server>                  立即连接，不激活
+/mcp disable <server>                 断开连接，不改配置
 /mcp scope <server> global|here|id,id 改可见范围（here = 当前工作区）
 /mcp diagnose [<server>]              探测命令/端点（省略则检查全部）
 /mcp help                             命令列表
 ```
 
-除 `activate` / `deactivate` / `scope` 外，命令都是只读的；改配置请用设置页。
+除 `activate` / `deactivate` / `enable` / `disable` / `scope` 外，命令都是只读的；改配置请用设置页。
 
 ### 侧边栏入口
 
